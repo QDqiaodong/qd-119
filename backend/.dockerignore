@@ -1,0 +1,16 @@
+target
+.idea
+.vscode
+.git
+.github
+*.log
+logs
+.DS_Store
+.env
+*.md
+*.iml
+*.ipr
+*.iws
+.gradle
+*.zip
+*.tar.gz
