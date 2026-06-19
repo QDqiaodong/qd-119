@@ -1,17 +1,23 @@
 package com.buckle.inventory.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.buckle.inventory.dto.InboundRequest;
 import com.buckle.inventory.dto.PageResult;
 import com.buckle.inventory.entity.InboundRecord;
+import com.buckle.inventory.entity.OutboundRecord;
 import com.buckle.inventory.entity.Part;
+import com.buckle.inventory.entity.ScrapRecord;
 import com.buckle.inventory.mapper.InboundRecordMapper;
+import com.buckle.inventory.mapper.OutboundRecordMapper;
 import com.buckle.inventory.mapper.PartMapper;
+import com.buckle.inventory.mapper.ScrapRecordMapper;
 import com.buckle.inventory.service.InboundService;
 import com.buckle.inventory.service.RedisCacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,16 +33,21 @@ public class InboundServiceImpl implements InboundService {
     private PartMapper partMapper;
 
     @Autowired
+    private OutboundRecordMapper outboundRecordMapper;
+
+    @Autowired
+    private ScrapRecordMapper scrapRecordMapper;
+
+    @Autowired
     private RedisCacheService redisCacheService;
 
     @Override
     public PageResult<InboundRecord> listInbound(int page, int size, String keyword) {
-        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<InboundRecord> queryWrapper =
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        LambdaQueryWrapper<InboundRecord> queryWrapper = new LambdaQueryWrapper<>();
 
         if (keyword != null && !keyword.trim().isEmpty()) {
             List<Part> matchedParts = partMapper.selectList(
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Part>()
+                    new LambdaQueryWrapper<Part>()
                             .like(Part::getName, keyword)
                             .or()
                             .like(Part::getModel, keyword));
@@ -62,43 +73,122 @@ public class InboundServiceImpl implements InboundService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public InboundRecord addInbound(InboundRequest request) {
+        validateRequest(request);
+
         Part part;
+        int inboundQuantity = request.getQuantity();
+
         if (request.getPartId() != null) {
             part = partMapper.selectById(request.getPartId());
             if (part == null) {
                 throw new RuntimeException("配件不存在");
             }
-            part.setCurrentStock(part.getCurrentStock() + request.getQuantity());
-            part.setTotalQuantity(part.getTotalQuantity() + request.getQuantity());
+
+            int oldTotal = part.getTotalQuantity() != null ? part.getTotalQuantity() : 0;
+            int oldStock = part.getCurrentStock() != null ? part.getCurrentStock() : 0;
+
+            int newTotal = oldTotal + inboundQuantity;
+            int newStock = oldStock + inboundQuantity;
+
+            part.setTotalQuantity(newTotal);
+            part.setCurrentStock(newStock);
+            if (StringUtils.hasText(request.getShelfPosition())) {
+                part.setShelfPosition(request.getShelfPosition());
+            }
             part.setUpdatedAt(LocalDateTime.now());
-            partMapper.updateById(part);
-        } else if (request.getPartName() != null && request.getPartModel() != null) {
+            int updateRows = partMapper.updateById(part);
+            if (updateRows == 0) {
+                throw new RuntimeException("更新配件库存失败，请重试");
+            }
+
+            Part updatedPart = partMapper.selectById(part.getId());
+            if (updatedPart.getTotalQuantity() != newTotal || updatedPart.getCurrentStock() != newStock) {
+                throw new RuntimeException("库存更新后一致性校验失败");
+            }
+
+            verifyPartConsistency(part.getId(), newTotal, newStock);
+        } else if (StringUtils.hasText(request.getPartName()) && StringUtils.hasText(request.getPartModel())) {
             part = new Part();
-            part.setName(request.getPartName());
-            part.setModel(request.getPartModel());
-            part.setTotalQuantity(request.getQuantity());
-            part.setCurrentStock(request.getQuantity());
+            part.setName(request.getPartName().trim());
+            part.setModel(request.getPartModel().trim());
+            part.setTotalQuantity(inboundQuantity);
+            part.setCurrentStock(inboundQuantity);
             part.setShelfPosition(request.getShelfPosition() != null ? request.getShelfPosition() : "");
             part.setCreatedAt(LocalDateTime.now());
             part.setUpdatedAt(LocalDateTime.now());
             partMapper.insert(part);
+
+            if (part.getId() == null) {
+                throw new RuntimeException("创建配件失败");
+            }
         } else {
             throw new RuntimeException("请提供配件ID或配件名称和型号");
         }
 
         InboundRecord record = new InboundRecord();
         record.setPartId(part.getId());
-        record.setQuantity(request.getQuantity());
+        record.setQuantity(inboundQuantity);
         record.setShelfPosition(request.getShelfPosition());
-        record.setOperator(request.getOperator());
+        record.setOperator(request.getOperator() != null ? request.getOperator().trim() : "system");
         record.setCreatedAt(LocalDateTime.now());
         record.setPartName(part.getName());
         record.setPartModel(part.getModel());
         inboundRecordMapper.insert(record);
 
+        if (record.getId() == null) {
+            throw new RuntimeException("记录入库流水失败");
+        }
+
         redisCacheService.refreshPartsCache();
         return record;
+    }
+
+    private void validateRequest(InboundRequest request) {
+        if (request == null) {
+            throw new RuntimeException("入库请求不能为空");
+        }
+        if (request.getQuantity() == null) {
+            throw new RuntimeException("入库数量不能为空");
+        }
+        if (request.getQuantity() <= 0) {
+            throw new RuntimeException("入库数量必须大于0，当前值: " + request.getQuantity());
+        }
+        if (!StringUtils.hasText(request.getOperator())) {
+            throw new RuntimeException("操作人不能为空");
+        }
+    }
+
+    private void verifyPartConsistency(Long partId, int expectedTotal, int expectedCurrentStock) {
+        Integer totalInbound = inboundRecordMapper.selectList(
+                        new LambdaQueryWrapper<InboundRecord>().eq(InboundRecord::getPartId, partId))
+                .stream()
+                .mapToInt(InboundRecord::getQuantity)
+                .sum();
+
+        Integer totalOutbound = outboundRecordMapper.selectList(
+                        new LambdaQueryWrapper<OutboundRecord>().eq(OutboundRecord::getPartId, partId))
+                .stream()
+                .mapToInt(OutboundRecord::getQuantity)
+                .sum();
+
+        Integer totalScrap = scrapRecordMapper.selectList(
+                        new LambdaQueryWrapper<ScrapRecord>().eq(ScrapRecord::getPartId, partId))
+                .stream()
+                .mapToInt(ScrapRecord::getQuantity)
+                .sum();
+
+        int calculatedTotal = totalInbound;
+        int calculatedStock = totalInbound - totalOutbound - totalScrap;
+
+        if (calculatedTotal != expectedTotal) {
+            throw new RuntimeException(
+                    String.format("总量一致性校验失败: 流水汇总=%d, 预期=%d", calculatedTotal, expectedTotal));
+        }
+        if (calculatedStock != expectedCurrentStock) {
+            throw new RuntimeException(
+                    String.format("库存一致性校验失败: 流水计算=%d, 预期=%d", calculatedStock, expectedCurrentStock));
+        }
     }
 }
