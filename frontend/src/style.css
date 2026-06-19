@@ -25,3 +25,15 @@ body {
 .animate-blink {
   animation: blink 1.5s ease-in-out infinite;
 }
+
+.animate-blink-slow {
+  animation: blink 2s ease-in-out infinite;
+}
+
+.animate-blink-medium {
+  animation: blink 1.3s ease-in-out infinite;
+}
+
+.animate-blink-fast {
+  animation: blink 0.8s ease-in-out infinite;
+}

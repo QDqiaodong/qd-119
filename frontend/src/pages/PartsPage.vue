@@ -58,6 +58,28 @@ const toggleSelect = (id: number) => {
   }
 }
 
+type StockLevel = 'critical' | 'low' | 'mild' | 'normal'
+
+const stockLevel = (p: Part): StockLevel => {
+  if (p.total_quantity <= 0) return 'normal'
+  const ratio = p.current_stock / p.total_quantity
+  if (ratio <= 0.1) return 'critical'
+  if (ratio <= 0.2) return 'low'
+  if (ratio <= 0.3) return 'mild'
+  return 'normal'
+}
+
+const stockLevelMeta: Record<StockLevel, { number: string; label: string; text: string }> = {
+  critical: { number: 'text-danger font-bold animate-blink-fast', label: 'text-danger', text: '严重不足' },
+  low: { number: 'text-orange-600 font-bold animate-blink-medium', label: 'text-orange-600', text: '库存偏低' },
+  mild: { number: 'text-yellow-600 font-bold animate-blink-slow', label: 'text-yellow-600', text: '库存略低' },
+  normal: { number: 'text-gray-700', label: '', text: '' },
+}
+
+const stockNumberClass = (p: Part) => stockLevelMeta[stockLevel(p)].number
+const stockLabelClass = (p: Part) => stockLevelMeta[stockLevel(p)].label
+const stockLabelText = (p: Part) => stockLevelMeta[stockLevel(p)].text
+
 const openAddModal = () => {
   editingPart.value = null
   form.value = { name: '', model: '', total_quantity: 0, shelf_position: '' }
@@ -228,7 +250,7 @@ onMounted(() => fetchParts())
                 <th class="text-left py-3 px-3 font-medium">操作</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody :key="page">
               <tr v-if="parts.length === 0">
                 <td colspan="9" class="text-center py-8 text-gray-400">暂无配件数据</td>
               </tr>
@@ -243,12 +265,10 @@ onMounted(() => fetchParts())
                 <td class="py-3 px-3">{{ p.model }}</td>
                 <td class="py-3 px-3">{{ p.total_quantity }}</td>
                 <td class="py-3 px-3">
-                  <span :class="[
-                    p.current_stock <= 5 ? 'text-danger font-bold animate-blink' : 'text-gray-700',
-                  ]">
-                    {{ p.current_stock }}
+                  <span :class="stockNumberClass(p)">{{ p.current_stock }}</span>
+                  <span v-if="stockLevel(p) !== 'normal'" class="ml-1 text-xs" :class="stockLabelClass(p)">
+                    ({{ stockLabelText(p) }})
                   </span>
-                  <span v-if="p.current_stock <= 5" class="ml-1 text-xs text-danger">(低库存)</span>
                 </td>
                 <td class="py-3 px-3">{{ p.shelf_position }}</td>
                 <td class="py-3 px-3 text-gray-400">{{ p.updated_at }}</td>
