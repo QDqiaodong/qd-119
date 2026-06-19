@@ -18,3 +18,15 @@ pnpm-debug.log*
 coverage
 *.zip
 *.tar.gz
+dist-ssr
+.cache
+.vite
+tmp
+temp
+*.tmp
+*.temp
+screenshots
+*.png
+*.jpg
+*.jpeg
+*.gif

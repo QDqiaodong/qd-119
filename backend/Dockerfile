@@ -1,6 +1,6 @@
 ARG DOCKER_REGISTRY=docker.io
 
-FROM ${DOCKER_REGISTRY}/maven:3.9-eclipse-temurin-17 AS build
+FROM ${DOCKER_REGISTRY}/library/maven:3.9-eclipse-temurin-17 AS build
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ COPY src ./src
 
 RUN mvn package -DskipTests -B
 
-FROM ${DOCKER_REGISTRY}/eclipse-temurin:17-jre
+FROM ${DOCKER_REGISTRY}/library/eclipse-temurin:17-jre-jammy
 
 WORKDIR /app
 

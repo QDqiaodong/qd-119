@@ -14,3 +14,16 @@ logs
 .gradle
 *.zip
 *.tar.gz
+build
+out
+*.tmp
+*.temp
+.cache
+tmp
+temp
+screenshots
+coverage
+*.png
+*.jpg
+*.jpeg
+*.gif
