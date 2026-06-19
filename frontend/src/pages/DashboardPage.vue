@@ -38,7 +38,10 @@ onMounted(async () => {
       dashboardApi.getRecent(),
     ])
     overview.value = overviewData
-    recentActivities.value = recentData
+    recentActivities.value = recentData.map((a) => ({
+      ...a,
+      type: (a.type || '').toLowerCase(),
+    }))
   } catch {
     overview.value = { total_parts: 0, total_stock: 0, monthly_inbound: 0, monthly_outbound: 0 }
   } finally {

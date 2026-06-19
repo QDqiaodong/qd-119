@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { Plus, Search, Edit, Trash2, Loader2, PackagePlus, X } from 'lucide-vue-next'
-import { partsApi, type Part } from '@/api'
+import { partsApi, inboundApi, type Part } from '@/api'
 import Toast from '@/components/Toast.vue'
 
 const loading = ref(true)
@@ -29,6 +29,15 @@ const showModal = ref(false)
 const editingPart = ref<Part | null>(null)
 const modalLoading = ref(false)
 const deleteLoading = ref<number | null>(null)
+
+const showBatchInboundModal = ref(false)
+const batchSubmitting = ref(false)
+const batchOperator = ref('')
+const batchQuantities = ref<Record<number, number>>({})
+
+const selectedParts = computed(() =>
+  parts.value.filter((p) => selectedIds.value.includes(p.id)),
+)
 
 const form = ref({
   name: '',
@@ -141,11 +150,53 @@ const onDelete = async (id: number) => {
 }
 
 const onBatchInbound = () => {
-  if (selectedIds.value.length === 0) {
+  if (selectedParts.value.length === 0) {
     showToast('请先选择配件', 'info')
     return
   }
-  showToast(`已选择 ${selectedIds.value.length} 个配件进行批量入库`, 'info')
+  batchOperator.value = ''
+  batchQuantities.value = Object.fromEntries(
+    selectedParts.value.map((p) => [p.id, 1]),
+  )
+  showBatchInboundModal.value = true
+}
+
+const closeBatchInbound = () => {
+  showBatchInboundModal.value = false
+}
+
+const onBatchInboundSubmit = async () => {
+  if (!batchOperator.value.trim()) {
+    showToast('请填写操作人', 'error')
+    return
+  }
+  for (const p of selectedParts.value) {
+    const qty = batchQuantities.value[p.id]
+    if (!qty || qty <= 0) {
+      showToast(`请为配件「${p.name}」填写有效入库数量`, 'error')
+      return
+    }
+  }
+
+  try {
+    batchSubmitting.value = true
+    for (const p of selectedParts.value) {
+      await inboundApi.create({
+        part_id: p.id,
+        quantity: batchQuantities.value[p.id],
+        shelf_position: p.shelf_position || undefined,
+        operator: batchOperator.value.trim(),
+      })
+    }
+    showToast(`已成功为 ${selectedParts.value.length} 个配件入库`)
+    showBatchInboundModal.value = false
+    selectedIds.value = []
+    await fetchParts()
+  } catch {
+    showToast('批量入库失败', 'error')
+  } finally {
+    batchSubmitting.value = false
+  }
 }
 
 const fetchParts = async () => {
@@ -169,6 +220,7 @@ const fetchParts = async () => {
 
 const onSearch = () => {
   page.value = 1
+  selectedIds.value = []
   fetchParts()
 }
 
@@ -177,6 +229,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize))
 const changePage = (p: number) => {
   if (p < 1 || p > totalPages()) return
   page.value = p
+  selectedIds.value = []
   fetchParts()
 }
 
@@ -343,6 +396,60 @@ onMounted(() => fetchParts())
               class="bg-primary-800 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center">
               <Loader2 v-if="modalLoading" :size="16" class="mr-2 animate-spin" />
               保存
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showBatchInboundModal" class="fixed inset-0 z-40 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" @click="closeBatchInbound"></div>
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 p-6 z-50 max-h-[85vh] flex flex-col">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold text-primary-800">批量入库</h3>
+            <button @click="closeBatchInbound" class="text-gray-400 hover:text-gray-600 transition-colors">
+              <X :size="20" />
+            </button>
+          </div>
+          <div class="overflow-y-auto flex-1 -mx-1 px-1">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-200 text-gray-500">
+                  <th class="text-left py-2 px-2 font-medium">配件名称</th>
+                  <th class="text-left py-2 px-2 font-medium">型号</th>
+                  <th class="text-left py-2 px-2 font-medium">当前库存</th>
+                  <th class="text-left py-2 px-2 font-medium">入库数量</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in selectedParts" :key="p.id" class="border-b border-gray-100">
+                  <td class="py-2 px-2 text-gray-800 font-medium">{{ p.name }}</td>
+                  <td class="py-2 px-2">{{ p.model }}</td>
+                  <td class="py-2 px-2">{{ p.current_stock }}</td>
+                  <td class="py-2 px-2">
+                    <input v-model.number="batchQuantities[p.id]" type="number" min="1"
+                      class="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-600 mb-1">操作人</label>
+            <input v-model="batchOperator" type="text" placeholder="请输入操作人"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div class="flex justify-end gap-3 mt-6">
+            <button @click="closeBatchInbound"
+              class="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">
+              取消
+            </button>
+            <button @click="onBatchInboundSubmit" :disabled="batchSubmitting"
+              class="bg-primary-800 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center">
+              <Loader2 v-if="batchSubmitting" :size="16" class="mr-2 animate-spin" />
+              <PackagePlus v-else :size="16" class="mr-2" />
+              确认入库
             </button>
           </div>
         </div>
