@@ -8,6 +8,8 @@ import {
   Trash2,
   List,
   Cog,
+  Grid3X3,
+  Ruler,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -20,6 +22,8 @@ const navItems = [
   { label: '季度盘点', icon: ClipboardCheck, path: '/inventory' },
   { label: '报废登记', icon: Trash2, path: '/scrap' },
   { label: '配件清单', icon: List, path: '/parts' },
+  { label: '卡扣型号墙', icon: Grid3X3, path: '/buckle-wall' },
+  { label: '支架尺寸看板', icon: Ruler, path: '/bracket-dashboard' },
 ]
 
 const isActive = (path: string) => {

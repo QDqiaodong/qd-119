@@ -6,6 +6,8 @@ import OutboundPage from '@/pages/OutboundPage.vue'
 import InventoryPage from '@/pages/InventoryPage.vue'
 import ScrapPage from '@/pages/ScrapPage.vue'
 import PartsPage from '@/pages/PartsPage.vue'
+import BuckleModelWall from '@/pages/BuckleModelWall.vue'
+import BracketSizeDashboard from '@/pages/BracketSizeDashboard.vue'
 
 const routes = [
   {
@@ -18,6 +20,8 @@ const routes = [
       { path: 'inventory', name: 'inventory', component: InventoryPage },
       { path: 'scrap', name: 'scrap', component: ScrapPage },
       { path: 'parts', name: 'parts', component: PartsPage },
+      { path: 'buckle-wall', name: 'buckle-wall', component: BuckleModelWall },
+      { path: 'bracket-dashboard', name: 'bracket-dashboard', component: BracketSizeDashboard },
     ],
   },
 ]

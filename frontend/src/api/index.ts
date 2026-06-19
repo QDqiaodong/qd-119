@@ -85,6 +85,18 @@ export interface DashboardOverview {
   monthly_outbound: number
 }
 
+export interface BucklePart extends Part {
+  last_inbound_time?: string
+  compatible_machines: string[]
+}
+
+export interface BracketPart extends Part {
+  length: number
+  hole_spacing: number
+  compatible_machines: string[]
+  last_inbound_time?: string
+}
+
 export interface RecentActivity {
   id: number
   type: string
@@ -139,4 +151,16 @@ export const scrapApi = {
 export const dashboardApi = {
   getOverview: () => http.get<any, DashboardOverview>('/api/dashboard/overview'),
   getRecent: () => http.get<any, RecentActivity[]>('/api/dashboard/recent'),
+}
+
+export const buckleApi = {
+  list: (params?: Record<string, unknown>) => http.get<any, PageResult<BucklePart>>('/api/buckles', { params }),
+  getLastInboundTime: (partId: number) =>
+    http.get<any, { last_inbound_time: string }>(`/api/buckles/${partId}/last-inbound`),
+}
+
+export const bracketApi = {
+  list: (params?: Record<string, unknown>) => http.get<any, PageResult<BracketPart>>('/api/brackets', { params }),
+  getLastInboundTime: (partId: number) =>
+    http.get<any, { last_inbound_time: string }>(`/api/brackets/${partId}/last-inbound`),
 }
