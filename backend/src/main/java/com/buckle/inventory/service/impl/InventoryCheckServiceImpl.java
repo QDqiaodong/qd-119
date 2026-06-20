@@ -96,11 +96,29 @@ public class InventoryCheckServiceImpl implements InventoryCheckService {
             List<InventoryCheckItem> items = inventoryCheckItemMapper.selectList(
                     new LambdaQueryWrapper<InventoryCheckItem>().eq(InventoryCheckItem::getCheckId, id));
             for (InventoryCheckItem item : items) {
-                Part part = partMapper.selectById(item.getPartId());
-                if (part != null) {
-                    item.setPartName(part.getName());
-                    item.setPartModel(part.getModel());
-                    item.setShelfPosition(part.getShelfPosition());
+                if (item.getPartName() == null || item.getPartModel() == null || item.getShelfPosition() == null) {
+                    Part part = partMapper.selectById(item.getPartId());
+                    if (part != null) {
+                        if (item.getPartName() == null) {
+                            item.setPartName(part.getName());
+                        }
+                        if (item.getPartModel() == null) {
+                            item.setPartModel(part.getModel());
+                        }
+                        if (item.getShelfPosition() == null) {
+                            item.setShelfPosition(part.getShelfPosition());
+                        }
+                    } else {
+                        if (item.getPartName() == null) {
+                            item.setPartName("未知配件");
+                        }
+                        if (item.getPartModel() == null) {
+                            item.setPartModel("-");
+                        }
+                        if (item.getShelfPosition() == null) {
+                            item.setShelfPosition("-");
+                        }
+                    }
                 }
             }
             check.setItems(items);

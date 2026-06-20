@@ -43,6 +43,7 @@ const form = ref({
   name: '',
   model: '',
   total_quantity: 0,
+  current_stock: 0,
   shelf_position: '',
 })
 
@@ -91,7 +92,7 @@ const stockLabelText = (p: Part) => stockLevelMeta[stockLevel(p)].text
 
 const openAddModal = () => {
   editingPart.value = null
-  form.value = { name: '', model: '', total_quantity: 0, shelf_position: '' }
+  form.value = { name: '', model: '', total_quantity: 0, current_stock: 0, shelf_position: '' }
   showModal.value = true
 }
 
@@ -101,6 +102,7 @@ const openEditModal = (part: Part) => {
     name: part.name,
     model: part.model,
     total_quantity: part.total_quantity,
+    current_stock: part.current_stock,
     shelf_position: part.shelf_position,
   }
   showModal.value = true
@@ -123,6 +125,7 @@ const onModalSubmit = async () => {
       await partsApi.update(editingPart.value.id, form.value)
       showToast('配件更新成功')
     } else {
+      form.value.current_stock = form.value.total_quantity
       await partsApi.create(form.value)
       showToast('配件添加成功')
     }

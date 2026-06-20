@@ -28,6 +28,7 @@ public class PartServiceImpl implements PartService {
     public PageResult<Part> listParts(PartQueryDTO query) {
         Page<Part> page = new Page<>(query.getPage(), query.getSize());
         LambdaQueryWrapper<Part> wrapper = new LambdaQueryWrapper<>();
+        wrapper.ne(Part::getDeleted, 1);
         if (StringUtils.hasText(query.getName())) {
             wrapper.like(Part::getName, query.getName());
         }
@@ -49,6 +50,18 @@ public class PartServiceImpl implements PartService {
 
     @Override
     public Part addPart(Part part) {
+        if (part.getTotalQuantity() == null) {
+            part.setTotalQuantity(0);
+        }
+        if (part.getCurrentStock() == null) {
+            part.setCurrentStock(part.getTotalQuantity());
+        }
+        if (part.getShelfPosition() == null) {
+            part.setShelfPosition("");
+        }
+        if (part.getDeleted() == null) {
+            part.setDeleted(0);
+        }
         part.setCreatedAt(LocalDateTime.now());
         part.setUpdatedAt(LocalDateTime.now());
         partMapper.insert(part);
@@ -66,13 +79,30 @@ public class PartServiceImpl implements PartService {
 
     @Override
     public void deletePart(Long id) {
-        partMapper.deleteById(id);
+        Part part = partMapper.selectById(id);
+        if (part != null) {
+            part.setDeleted(1);
+            part.setUpdatedAt(LocalDateTime.now());
+            partMapper.updateById(part);
+        }
         redisCacheService.refreshPartsCache();
     }
 
     @Override
     public List<Part> batchAddParts(List<Part> parts) {
         for (Part part : parts) {
+            if (part.getTotalQuantity() == null) {
+                part.setTotalQuantity(0);
+            }
+            if (part.getCurrentStock() == null) {
+                part.setCurrentStock(part.getTotalQuantity());
+            }
+            if (part.getShelfPosition() == null) {
+                part.setShelfPosition("");
+            }
+            if (part.getDeleted() == null) {
+                part.setDeleted(0);
+            }
             part.setCreatedAt(LocalDateTime.now());
             part.setUpdatedAt(LocalDateTime.now());
             partMapper.insert(part);
@@ -83,6 +113,8 @@ public class PartServiceImpl implements PartService {
 
     @Override
     public List<Part> getAllParts() {
-        return partMapper.selectList(null);
+        LambdaQueryWrapper<Part> wrapper = new LambdaQueryWrapper<>();
+        wrapper.ne(Part::getDeleted, 1);
+        return partMapper.selectList(wrapper);
     }
 }

@@ -34,6 +34,9 @@ public class Part {
     @TableField("shelf_position")
     private String shelfPosition;
 
+    @TableField("deleted")
+    private Integer deleted;
+
     @TableField("created_at")
     private LocalDateTime createdAt;
 

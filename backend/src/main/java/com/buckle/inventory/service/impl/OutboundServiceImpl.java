@@ -36,10 +36,23 @@ public class OutboundServiceImpl implements OutboundService {
         Page<OutboundRecord> result = outboundRecordMapper.selectPage(pageParam, wrapper);
         PageResult<OutboundRecord> pageResult = new PageResult<>(result.getRecords(), result.getTotal(), page, size);
         for (OutboundRecord record : pageResult.getList()) {
-            Part part = partMapper.selectById(record.getPartId());
-            if (part != null) {
-                record.setPartName(part.getName());
-                record.setPartModel(part.getModel());
+            if (record.getPartName() == null || record.getPartModel() == null) {
+                Part part = partMapper.selectById(record.getPartId());
+                if (part != null) {
+                    if (record.getPartName() == null) {
+                        record.setPartName(part.getName());
+                    }
+                    if (record.getPartModel() == null) {
+                        record.setPartModel(part.getModel());
+                    }
+                } else {
+                    if (record.getPartName() == null) {
+                        record.setPartName("未知配件");
+                    }
+                    if (record.getPartModel() == null) {
+                        record.setPartModel("-");
+                    }
+                }
             }
         }
         return pageResult;
@@ -51,6 +64,9 @@ public class OutboundServiceImpl implements OutboundService {
         Part part = partMapper.selectById(request.getPartId());
         if (part == null) {
             throw new RuntimeException("配件不存在");
+        }
+        if (part.getDeleted() != null && part.getDeleted() == 1) {
+            throw new RuntimeException("配件已删除，无法出库");
         }
         if (part.getCurrentStock() < request.getQuantity()) {
             throw new RuntimeException("库存不足，当前库存: " + part.getCurrentStock());

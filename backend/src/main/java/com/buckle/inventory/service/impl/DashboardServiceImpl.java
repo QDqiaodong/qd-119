@@ -36,9 +36,12 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public DashboardOverview getOverview() {
-        Long totalParts = partMapper.selectCount(null);
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.buckle.inventory.entity.Part> partWrapper =
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        partWrapper.ne(com.buckle.inventory.entity.Part::getDeleted, 1);
+        Long totalParts = partMapper.selectCount(partWrapper);
 
-        List<com.buckle.inventory.entity.Part> allParts = partMapper.selectList(null);
+        List<com.buckle.inventory.entity.Part> allParts = partMapper.selectList(partWrapper);
         int totalStock = allParts.stream().mapToInt(p -> p.getCurrentStock() != null ? p.getCurrentStock() : 0).sum();
 
         LocalDateTime monthStart = YearMonth.now().atDay(1).atStartOfDay();
@@ -68,8 +71,12 @@ public class DashboardServiceImpl implements DashboardService {
         inboundWrapper.orderByDesc(InboundRecord::getCreatedAt).last("LIMIT 5");
         List<InboundRecord> inboundRecords = inboundRecordMapper.selectList(inboundWrapper);
         for (InboundRecord r : inboundRecords) {
-            com.buckle.inventory.entity.Part part = partMapper.selectById(r.getPartId());
-            String desc = (part != null ? part.getName() : "未知配件") + " 入库 " + r.getQuantity() + "个";
+            String partName = r.getPartName();
+            if (partName == null) {
+                com.buckle.inventory.entity.Part part = partMapper.selectById(r.getPartId());
+                partName = (part != null ? part.getName() : "未知配件");
+            }
+            String desc = partName + " 入库 " + r.getQuantity() + "个";
             activities.add(new RecentActivity("INBOUND", desc, r.getCreatedAt()));
         }
 
@@ -78,8 +85,12 @@ public class DashboardServiceImpl implements DashboardService {
         outboundWrapper.orderByDesc(OutboundRecord::getCreatedAt).last("LIMIT 5");
         List<OutboundRecord> outboundRecords = outboundRecordMapper.selectList(outboundWrapper);
         for (OutboundRecord r : outboundRecords) {
-            com.buckle.inventory.entity.Part part = partMapper.selectById(r.getPartId());
-            String desc = (part != null ? part.getName() : "未知配件") + " 出库 " + r.getQuantity() + "个 -> " + r.getProductionLine();
+            String partName = r.getPartName();
+            if (partName == null) {
+                com.buckle.inventory.entity.Part part = partMapper.selectById(r.getPartId());
+                partName = (part != null ? part.getName() : "未知配件");
+            }
+            String desc = partName + " 出库 " + r.getQuantity() + "个 -> " + r.getProductionLine();
             activities.add(new RecentActivity("OUTBOUND", desc, r.getCreatedAt()));
         }
 
@@ -88,8 +99,12 @@ public class DashboardServiceImpl implements DashboardService {
         scrapWrapper.orderByDesc(ScrapRecord::getCreatedAt).last("LIMIT 5");
         List<ScrapRecord> scrapRecords = scrapRecordMapper.selectList(scrapWrapper);
         for (ScrapRecord r : scrapRecords) {
-            com.buckle.inventory.entity.Part part = partMapper.selectById(r.getPartId());
-            String desc = (part != null ? part.getName() : "未知配件") + " 报废 " + r.getQuantity() + "个";
+            String partName = r.getPartName();
+            if (partName == null) {
+                com.buckle.inventory.entity.Part part = partMapper.selectById(r.getPartId());
+                partName = (part != null ? part.getName() : "未知配件");
+            }
+            String desc = partName + " 报废 " + r.getQuantity() + "个";
             activities.add(new RecentActivity("SCRAP", desc, r.getCreatedAt()));
         }
 

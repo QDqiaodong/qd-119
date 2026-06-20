@@ -51,11 +51,15 @@ public class InboundServiceImpl implements InboundService {
                             .like(Part::getName, keyword)
                             .or()
                             .like(Part::getModel, keyword));
-            if (matchedParts.isEmpty()) {
-                return new PageResult<>(List.of(), 0, page, size);
+            if (!matchedParts.isEmpty()) {
+                List<Long> partIds = matchedParts.stream().map(Part::getId).collect(Collectors.toList());
+                queryWrapper.and(w -> w.in(InboundRecord::getPartId, partIds)
+                        .or().like(InboundRecord::getPartName, keyword)
+                        .or().like(InboundRecord::getPartModel, keyword));
+            } else {
+                queryWrapper.and(w -> w.like(InboundRecord::getPartName, keyword)
+                        .or().like(InboundRecord::getPartModel, keyword));
             }
-            List<Long> partIds = matchedParts.stream().map(Part::getId).collect(Collectors.toList());
-            queryWrapper.in(InboundRecord::getPartId, partIds);
         }
 
         queryWrapper.orderByDesc(InboundRecord::getCreatedAt);
@@ -63,10 +67,23 @@ public class InboundServiceImpl implements InboundService {
         Page<InboundRecord> result = inboundRecordMapper.selectPage(pageParam, queryWrapper);
         PageResult<InboundRecord> pageResult = new PageResult<>(result.getRecords(), result.getTotal(), page, size);
         for (InboundRecord record : pageResult.getList()) {
-            Part part = partMapper.selectById(record.getPartId());
-            if (part != null) {
-                record.setPartName(part.getName());
-                record.setPartModel(part.getModel());
+            if (record.getPartName() == null || record.getPartModel() == null) {
+                Part part = partMapper.selectById(record.getPartId());
+                if (part != null) {
+                    if (record.getPartName() == null) {
+                        record.setPartName(part.getName());
+                    }
+                    if (record.getPartModel() == null) {
+                        record.setPartModel(part.getModel());
+                    }
+                } else {
+                    if (record.getPartName() == null) {
+                        record.setPartName("未知配件");
+                    }
+                    if (record.getPartModel() == null) {
+                        record.setPartModel("-");
+                    }
+                }
             }
         }
         return pageResult;
@@ -84,6 +101,9 @@ public class InboundServiceImpl implements InboundService {
             part = partMapper.selectById(request.getPartId());
             if (part == null) {
                 throw new RuntimeException("配件不存在");
+            }
+            if (part.getDeleted() != null && part.getDeleted() == 1) {
+                throw new RuntimeException("配件已删除，无法入库");
             }
 
             int oldTotal = part.getTotalQuantity() != null ? part.getTotalQuantity() : 0;

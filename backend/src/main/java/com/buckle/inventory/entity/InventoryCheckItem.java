@@ -32,12 +32,12 @@ public class InventoryCheckItem {
     @TableField("difference")
     private Integer difference;
 
-    @TableField(exist = false)
+    @TableField("part_name")
     private String partName;
 
-    @TableField(exist = false)
+    @TableField("part_model")
     private String partModel;
 
-    @TableField(exist = false)
+    @TableField("shelf_position")
     private String shelfPosition;
 }

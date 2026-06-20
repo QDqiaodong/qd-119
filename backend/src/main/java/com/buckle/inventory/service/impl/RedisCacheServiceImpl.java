@@ -29,7 +29,10 @@ public class RedisCacheServiceImpl implements RedisCacheService {
     @Override
     public void refreshPartsCache() {
         evictPartsCache();
-        List<Part> parts = partMapper.selectList(null);
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Part> wrapper =
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        wrapper.ne(Part::getDeleted, 1);
+        List<Part> parts = partMapper.selectList(wrapper);
         for (Part part : parts) {
             try {
                 String json = objectMapper.writeValueAsString(part);

@@ -34,9 +34,9 @@ public class OutboundRecord {
     @TableField("created_at")
     private LocalDateTime createdAt;
 
-    @TableField(exist = false)
+    @TableField("part_name")
     private String partName;
 
-    @TableField(exist = false)
+    @TableField("part_model")
     private String partModel;
 }
