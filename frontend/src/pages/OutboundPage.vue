@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { PackageMinus, Search, Loader2 } from 'lucide-vue-next'
 import { outboundApi, partsApi, type OutboundRecord, type Part } from '@/api'
 import Toast from '@/components/Toast.vue'
+import ProductionLineBadge from '@/components/ProductionLineBadge.vue'
 
 const loading = ref(true)
 const submitLoading = ref(false)
@@ -97,13 +98,6 @@ const onSubmit = async () => {
   } finally {
     submitLoading.value = false
   }
-}
-
-const lineColorMap: Record<string, string> = {
-  '产线A': 'bg-blue-100 text-blue-700',
-  '产线B': 'bg-green-100 text-green-700',
-  '产线C': 'bg-purple-100 text-purple-700',
-  '产线D': 'bg-yellow-100 text-yellow-700',
 }
 
 const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize))
@@ -204,9 +198,7 @@ onMounted(() => {
                 <td class="py-3 px-4">{{ r.part_model }}</td>
                 <td class="py-3 px-4 text-danger font-medium">-{{ r.quantity }}</td>
                 <td class="py-3 px-4">
-                  <span :class="[lineColorMap[r.production_line] ?? 'bg-gray-100 text-gray-700', 'px-2 py-0.5 rounded text-xs font-medium']">
-                    {{ r.production_line }}
-                  </span>
+                  <ProductionLineBadge :line="r.production_line" />
                 </td>
                 <td class="py-3 px-4">{{ r.operator }}</td>
                 <td class="py-3 px-4 text-gray-400">{{ r.created_at }}</td>

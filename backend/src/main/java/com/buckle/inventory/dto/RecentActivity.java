@@ -14,4 +14,5 @@ public class RecentActivity {
     private String type;
     private String description;
     private LocalDateTime time;
+    private String productionLine;
 }

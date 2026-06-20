@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { Package, Warehouse, TrendingUp, TrendingDown, ArrowRight, Activity } from 'lucide-vue-next'
 import { dashboardApi, type DashboardOverview, type RecentActivity } from '@/api'
+import ProductionLineBadge from '@/components/ProductionLineBadge.vue'
 
 const loading = ref(true)
 const overview = ref<DashboardOverview>({
@@ -106,6 +107,11 @@ onMounted(async () => {
                   }"
                 >{{ typeLabelMap[activity.type] ?? activity.type }}</span>
                 {{ activity.description }}
+                <ProductionLineBadge
+                  v-if="activity.type === 'outbound' && activity.production_line"
+                  :line="activity.production_line"
+                  class="ml-1"
+                />
               </div>
             </div>
             <div class="text-xs text-gray-400 ml-4">{{ activity.time }}</div>

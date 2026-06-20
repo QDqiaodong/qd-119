@@ -77,7 +77,7 @@ public class DashboardServiceImpl implements DashboardService {
                 partName = (part != null ? part.getName() : "未知配件");
             }
             String desc = partName + " 入库 " + r.getQuantity() + "个";
-            activities.add(new RecentActivity("INBOUND", desc, r.getCreatedAt()));
+            activities.add(new RecentActivity("INBOUND", desc, r.getCreatedAt(), null));
         }
 
         com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OutboundRecord> outboundWrapper =
@@ -90,8 +90,8 @@ public class DashboardServiceImpl implements DashboardService {
                 com.buckle.inventory.entity.Part part = partMapper.selectById(r.getPartId());
                 partName = (part != null ? part.getName() : "未知配件");
             }
-            String desc = partName + " 出库 " + r.getQuantity() + "个 -> " + r.getProductionLine();
-            activities.add(new RecentActivity("OUTBOUND", desc, r.getCreatedAt()));
+            String desc = partName + " 出库 " + r.getQuantity() + "个";
+            activities.add(new RecentActivity("OUTBOUND", desc, r.getCreatedAt(), r.getProductionLine()));
         }
 
         com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ScrapRecord> scrapWrapper =
@@ -105,7 +105,7 @@ public class DashboardServiceImpl implements DashboardService {
                 partName = (part != null ? part.getName() : "未知配件");
             }
             String desc = partName + " 报废 " + r.getQuantity() + "个";
-            activities.add(new RecentActivity("SCRAP", desc, r.getCreatedAt()));
+            activities.add(new RecentActivity("SCRAP", desc, r.getCreatedAt(), null));
         }
 
         activities.sort(Comparator.comparing(RecentActivity::getTime).reversed());

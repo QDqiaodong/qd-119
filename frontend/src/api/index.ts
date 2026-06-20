@@ -102,6 +102,7 @@ export interface RecentActivity {
   type: string
   description: string
   time: string
+  production_line?: string
 }
 
 export interface PageResult<T> {

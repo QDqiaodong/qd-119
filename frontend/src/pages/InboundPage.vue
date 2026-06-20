@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Plus, Search, Loader2 } from 'lucide-vue-next'
 import { inboundApi, partsApi, type InboundRecord, type Part } from '@/api'
 import Toast from '@/components/Toast.vue'
@@ -56,6 +56,10 @@ const onPartSelect = (id: number | null) => {
     isNewPart.value = true
   }
 }
+
+const selectedPart = computed(() =>
+  parts.value.find((p) => p.id === selectedPartId.value),
+)
 
 const fetchRecords = async () => {
   try {
@@ -172,6 +176,27 @@ onMounted(() => {
           <label class="block text-sm font-medium text-gray-600 mb-1">操作人</label>
           <input v-model="form.operator" type="text" placeholder="请输入操作人"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+        </div>
+      </div>
+
+      <div v-if="!isNewPart && selectedPart" class="mt-4 p-4 bg-primary-50 rounded-lg">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div>
+            <span class="text-gray-500">型号：</span>
+            <span class="font-medium text-gray-800">{{ selectedPart.model || '-' }}</span>
+          </div>
+          <div>
+            <span class="text-gray-500">货架位置：</span>
+            <span class="font-medium text-gray-800">{{ selectedPart.shelf_position || '-' }}</span>
+          </div>
+          <div>
+            <span class="text-gray-500">当前库存：</span>
+            <span class="font-bold text-primary-800">{{ selectedPart.current_stock }}</span>
+          </div>
+          <div>
+            <span class="text-gray-500">入库总量：</span>
+            <span class="font-bold text-primary-800">{{ selectedPart.total_quantity }}</span>
+          </div>
         </div>
       </div>
 
