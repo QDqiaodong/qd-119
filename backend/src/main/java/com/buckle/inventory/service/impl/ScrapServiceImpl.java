@@ -56,6 +56,8 @@ public class ScrapServiceImpl implements ScrapService {
     @Override
     @Transactional
     public ScrapRecord addScrap(ScrapRequest request) {
+        validateRequest(request);
+
         Part part = partMapper.selectById(request.getPartId());
         if (part == null) {
             throw new RuntimeException("配件不存在");
@@ -83,5 +85,20 @@ public class ScrapServiceImpl implements ScrapService {
         scrapRecordMapper.insert(record);
 
         return record;
+    }
+
+    private void validateRequest(ScrapRequest request) {
+        if (request == null) {
+            throw new RuntimeException("报废请求不能为空");
+        }
+        if (request.getQuantity() == null) {
+            throw new RuntimeException("报废数量不能为空");
+        }
+        if (request.getQuantity() <= 0) {
+            throw new RuntimeException("报废数量必须大于0，当前值: " + request.getQuantity());
+        }
+        if (!org.springframework.util.StringUtils.hasText(request.getOperator())) {
+            throw new RuntimeException("操作人不能为空");
+        }
     }
 }

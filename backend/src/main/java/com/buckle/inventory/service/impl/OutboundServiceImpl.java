@@ -61,6 +61,8 @@ public class OutboundServiceImpl implements OutboundService {
     @Override
     @Transactional
     public OutboundRecord addOutbound(OutboundRequest request) {
+        validateRequest(request);
+
         Part part = partMapper.selectById(request.getPartId());
         if (part == null) {
             throw new RuntimeException("配件不存在");
@@ -87,5 +89,20 @@ public class OutboundServiceImpl implements OutboundService {
         outboundRecordMapper.insert(record);
 
         return record;
+    }
+
+    private void validateRequest(OutboundRequest request) {
+        if (request == null) {
+            throw new RuntimeException("出库请求不能为空");
+        }
+        if (request.getQuantity() == null) {
+            throw new RuntimeException("出库数量不能为空");
+        }
+        if (request.getQuantity() <= 0) {
+            throw new RuntimeException("出库数量必须大于0，当前值: " + request.getQuantity());
+        }
+        if (!StringUtils.hasText(request.getOperator())) {
+            throw new RuntimeException("操作人不能为空");
+        }
     }
 }
