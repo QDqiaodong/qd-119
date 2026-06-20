@@ -7,9 +7,9 @@ import com.buckle.inventory.dto.PageResult;
 import com.buckle.inventory.entity.InventoryCheck;
 import com.buckle.inventory.entity.InventoryCheckItem;
 import com.buckle.inventory.entity.Part;
-import com.buckle.inventory.mapper.InventoryCheckItemMapper;
 import com.buckle.inventory.mapper.InventoryCheckMapper;
 import com.buckle.inventory.mapper.PartMapper;
+import com.buckle.inventory.service.InventoryCheckItemService;
 import com.buckle.inventory.service.InventoryCheckService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -26,7 +26,7 @@ public class InventoryCheckServiceImpl implements InventoryCheckService {
     private InventoryCheckMapper inventoryCheckMapper;
 
     @Autowired
-    private InventoryCheckItemMapper inventoryCheckItemMapper;
+    private InventoryCheckItemService inventoryCheckItemService;
 
     @Autowired
     private PartMapper partMapper;
@@ -82,8 +82,8 @@ public class InventoryCheckServiceImpl implements InventoryCheckService {
 
         for (InventoryCheckItem item : items) {
             item.setCheckId(check.getId());
-            inventoryCheckItemMapper.insert(item);
         }
+        inventoryCheckItemService.saveBatch(items);
 
         check.setItems(items);
         return check;
@@ -93,7 +93,7 @@ public class InventoryCheckServiceImpl implements InventoryCheckService {
     public InventoryCheck getCheckDetail(Long id) {
         InventoryCheck check = inventoryCheckMapper.selectById(id);
         if (check != null) {
-            List<InventoryCheckItem> items = inventoryCheckItemMapper.selectList(
+            List<InventoryCheckItem> items = inventoryCheckItemService.list(
                     new LambdaQueryWrapper<InventoryCheckItem>().eq(InventoryCheckItem::getCheckId, id));
             for (InventoryCheckItem item : items) {
                 if (item.getPartName() == null || item.getPartModel() == null || item.getShelfPosition() == null) {

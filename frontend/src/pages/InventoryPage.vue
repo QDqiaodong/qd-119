@@ -88,8 +88,8 @@ const diffClass = (diff: number) => {
 
 const diffLabel = (diff: number) => {
   if (diff === 0) return '相符'
-  if (diff > 0) return `盘盈+${diff}`
-  return `盘亏${diff}`
+  if (diff > 0) return `多出${diff}个`
+  return `缺少${Math.abs(diff)}个`
 }
 
 const onSubmit = async () => {
@@ -314,10 +314,14 @@ onMounted(() => {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  <tr v-for="item in section.items" :key="item.part_id" class="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
-                                    <td class="py-2 px-4 text-gray-800">{{ item.part_name }}</td>
-                                    <td class="py-2 px-4 text-gray-600">{{ item.part_model }}</td>
-                                    <td class="py-2 px-4 text-gray-500">{{ item.shelf_position }}</td>
+                                  <tr v-for="item in section.items" :key="item.part_id" 
+                                    :class="[
+                                      'border-b border-gray-100 last:border-b-0 transition-colors',
+                                      section.key === 'match' ? 'opacity-50 text-gray-400' : 'hover:bg-gray-50'
+                                    ]">
+                                    <td :class="['py-2 px-4', section.key === 'match' ? 'text-gray-400' : 'text-gray-800']">{{ item.part_name }}</td>
+                                    <td :class="['py-2 px-4', section.key === 'match' ? 'text-gray-400' : 'text-gray-600']">{{ item.part_model }}</td>
+                                    <td :class="['py-2 px-4', section.key === 'match' ? 'text-gray-400' : 'text-gray-500']">{{ item.shelf_position }}</td>
                                     <td class="py-2 px-4 font-mono">{{ item.book_quantity }}</td>
                                     <td class="py-2 px-4 font-mono">{{ item.actual_quantity }}</td>
                                     <td class="py-2 px-4">
