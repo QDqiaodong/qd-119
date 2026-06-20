@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { ClipboardCheck, ChevronDown, ChevronRight, Loader2 } from 'lucide-vue-next'
-import { inventoryApi, partsApi, type InventoryRecord, type Part } from '@/api'
+import { ref, onMounted } from 'vue'
+import { ClipboardCheck, ChevronDown, ChevronRight, Loader2, TrendingUp, TrendingDown, Check } from 'lucide-vue-next'
+import { inventoryApi, partsApi, type InventoryRecord, type Part, type InventoryItem } from '@/api'
 import Toast from '@/components/Toast.vue'
 
 const loading = ref(true)
@@ -26,6 +26,23 @@ const operator = ref('')
 const allParts = ref<Part[]>([])
 const checkItems = ref<{ part_id: number; part_name: string; part_model: string; shelf_position: string; book_quantity: number; actual_quantity: number }[]>([])
 const expandedId = ref<number | null>(null)
+const expandedSections = ref<Record<number, Record<string, boolean>>>({})
+
+const ensureExpandedSections = (recordId: number) => {
+  if (!expandedSections.value[recordId]) {
+    expandedSections.value[recordId] = { surplus: false, deficit: false, match: false }
+  }
+  return expandedSections.value[recordId]
+}
+
+const toggleSection = (recordId: number, section: 'surplus' | 'deficit' | 'match') => {
+  const sections = ensureExpandedSections(recordId)
+  sections[section] = !sections[section]
+}
+
+const getSurplusItems = (items: InventoryItem[]) => items.filter((i) => i.difference > 0)
+const getDeficitItems = (items: InventoryItem[]) => items.filter((i) => i.difference < 0)
+const getMatchItems = (items: InventoryItem[]) => items.filter((i) => i.difference === 0)
 
 const generateQuarters = () => {
   const now = new Date()
@@ -262,29 +279,60 @@ onMounted(() => {
                   <td class="py-3 px-4 text-gray-400">{{ r.created_at }}</td>
                 </tr>
                 <tr v-if="expandedId === r.id && r.items?.length">
-                  <td colspan="8" class="bg-gray-50 px-8 py-3">
-                    <table class="w-full text-sm">
-                      <thead>
-                        <tr class="text-gray-500">
-                          <th class="text-left py-1 px-2 font-medium">配件名称</th>
-                          <th class="text-left py-1 px-2 font-medium">型号</th>
-                          <th class="text-left py-1 px-2 font-medium">账面</th>
-                          <th class="text-left py-1 px-2 font-medium">实物</th>
-                          <th class="text-left py-1 px-2 font-medium">差额</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="item in r.items" :key="item.part_id" class="border-b border-gray-200">
-                          <td class="py-1 px-2">{{ item.part_name }}</td>
-                          <td class="py-1 px-2">{{ item.part_model }}</td>
-                          <td class="py-1 px-2">{{ item.book_quantity }}</td>
-                          <td class="py-1 px-2">{{ item.actual_quantity }}</td>
-                          <td class="py-1 px-2" :class="diffClass(item.difference)">
-                            {{ diffLabel(item.difference) }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                  <td colspan="8" class="bg-gray-50 px-6 py-4">
+                    <div class="space-y-3">
+                      <template v-for="section in [
+                        { key: 'surplus', title: '盘盈', icon: TrendingUp, items: getSurplusItems(r.items), badgeClass: 'bg-primary-100 text-primary-800', borderClass: 'border-l-primary-500' },
+                        { key: 'deficit', title: '盘亏', icon: TrendingDown, items: getDeficitItems(r.items), badgeClass: 'bg-red-100 text-danger', borderClass: 'border-l-danger' },
+                        { key: 'match', title: '相符', icon: Check, items: getMatchItems(r.items), badgeClass: 'bg-green-100 text-success', borderClass: 'border-l-success' },
+                      ]" :key="section.key">
+                        <div :class="['bg-white rounded-lg border-l-4 shadow-sm', section.borderClass]">
+                          <div
+                            class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                            @click="toggleSection(r.id, section.key as 'surplus' | 'deficit' | 'match')">
+                            <div class="flex items-center gap-3">
+                              <component :is="expandedSections[r.id]?.[section.key] ? ChevronDown : ChevronRight" :size="16" class="text-gray-400" />
+                              <component :is="section.icon" :size="18" :class="section.key === 'surplus' ? 'text-primary-600' : section.key === 'deficit' ? 'text-danger' : 'text-success'" />
+                              <span class="font-medium text-gray-800">{{ section.title }}</span>
+                              <span :class="['px-2 py-0.5 rounded-full text-xs font-medium', section.badgeClass]">{{ section.items.length }}</span>
+                            </div>
+                          </div>
+                          <div v-if="expandedSections[r.id]?.[section.key]" class="border-t border-gray-100">
+                            <div v-if="section.items.length === 0" class="px-4 py-6 text-center text-gray-400 text-sm">
+                              无{{ section.title }}配件
+                            </div>
+                            <div v-else class="overflow-x-auto">
+                              <table class="w-full text-sm">
+                                <thead>
+                                  <tr class="bg-gray-50 text-gray-500">
+                                    <th class="text-left py-2 px-4 font-medium">配件名称</th>
+                                    <th class="text-left py-2 px-4 font-medium">型号</th>
+                                    <th class="text-left py-2 px-4 font-medium">货架位置</th>
+                                    <th class="text-left py-2 px-4 font-medium">账面数</th>
+                                    <th class="text-left py-2 px-4 font-medium">实物数</th>
+                                    <th class="text-left py-2 px-4 font-medium">差额</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr v-for="item in section.items" :key="item.part_id" class="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
+                                    <td class="py-2 px-4 text-gray-800">{{ item.part_name }}</td>
+                                    <td class="py-2 px-4 text-gray-600">{{ item.part_model }}</td>
+                                    <td class="py-2 px-4 text-gray-500">{{ item.shelf_position }}</td>
+                                    <td class="py-2 px-4 font-mono">{{ item.book_quantity }}</td>
+                                    <td class="py-2 px-4 font-mono">{{ item.actual_quantity }}</td>
+                                    <td class="py-2 px-4">
+                                      <span :class="['font-medium', diffClass(item.difference)]">
+                                        {{ diffLabel(item.difference) }}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
                   </td>
                 </tr>
               </template>
