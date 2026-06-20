@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Plus, Search, Loader2 } from 'lucide-vue-next'
-import { inboundApi, partsApi, type InboundRecord, type Part } from '@/api'
+import { inboundApi, partsApi, accessoryCategoryApi, shelfOccupancyApi, type InboundRecord, type Part, type AccessoryCategory, type ShelfOccupancyInfo } from '@/api'
 import Toast from '@/components/Toast.vue'
 
 const loading = ref(true)
 const submitLoading = ref(false)
 const records = ref<InboundRecord[]>([])
 const parts = ref<Part[]>([])
+const categories = ref<AccessoryCategory[]>([])
+const shelfInfo = ref<ShelfOccupancyInfo | null>(null)
 const total = ref(0)
 const page = ref(1)
 const pageSize = 10
@@ -27,6 +29,7 @@ const selectedPartId = ref<number | null>(null)
 const isNewPart = ref(true)
 
 const form = ref({
+  category_id: 0,
   name: '',
   model: '',
   quantity: 1,
@@ -34,22 +37,51 @@ const form = ref({
   operator: '',
 })
 
+watch(() => form.value.shelf_position, async (pos) => {
+  if (pos && pos.trim()) {
+    try {
+      shelfInfo.value = await shelfOccupancyApi.getByPosition(encodeURIComponent(pos))
+    } catch {
+      shelfInfo.value = null
+    }
+  } else {
+    shelfInfo.value = null
+  }
+})
+
+const shelfUsagePercent = computed(() => {
+  if (!shelfInfo.value) return 0
+  return shelfInfo.value.max_stock_capacity > 0
+    ? Math.min(100, (shelfInfo.value.total_stock / shelfInfo.value.max_stock_capacity) * 100)
+    : 0
+})
+
+const shelfTypePercent = computed(() => {
+  if (!shelfInfo.value) return 0
+  return shelfInfo.value.max_part_types > 0
+    ? Math.min(100, (shelfInfo.value.part_type_count / shelfInfo.value.max_part_types) * 100)
+    : 0
+})
+
 const resetForm = () => {
-  form.value = { name: '', model: '', quantity: 1, shelf_position: '', operator: '' }
+  form.value = { category_id: 0, name: '', model: '', quantity: 1, shelf_position: '', operator: '' }
   selectedPartId.value = null
   isNewPart.value = true
+  shelfInfo.value = null
 }
 
 const onPartSelect = (id: number | null) => {
   if (id) {
     const part = parts.value.find((p) => p.id === id)
     if (part) {
+      form.value.category_id = part.category_id
       form.value.name = part.name
       form.value.model = part.model
       form.value.shelf_position = part.shelf_position
       isNewPart.value = false
     }
   } else {
+    form.value.category_id = 0
     form.value.name = ''
     form.value.model = ''
     form.value.shelf_position = ''
@@ -83,10 +115,24 @@ const fetchParts = async () => {
   }
 }
 
+const fetchCategories = async () => {
+  try {
+    categories.value = await accessoryCategoryApi.list()
+  } catch {
+    categories.value = []
+  }
+}
+
 const onSubmit = async () => {
-  if (isNewPart.value && (!form.value.name || !form.value.model)) {
-    showToast('请填写配件名称和型号', 'error')
-    return
+  if (isNewPart.value) {
+    if (!form.value.category_id) {
+      showToast('请选择配件类别', 'error')
+      return
+    }
+    if (!form.value.name || !form.value.model) {
+      showToast('请填写配件名称和型号', 'error')
+      return
+    }
   }
   if (!form.value.quantity || form.value.quantity <= 0) {
     showToast('请填写入库数量', 'error')
@@ -101,6 +147,7 @@ const onSubmit = async () => {
     submitLoading.value = true
     await inboundApi.create({
       part_id: isNewPart.value ? undefined : selectedPartId.value ?? undefined,
+      category_id: isNewPart.value ? form.value.category_id : undefined,
       part_name: isNewPart.value ? form.value.name : undefined,
       part_model: isNewPart.value ? form.value.model : undefined,
       quantity: form.value.quantity,
@@ -111,8 +158,8 @@ const onSubmit = async () => {
     resetForm()
     await fetchRecords()
     await fetchParts()
-  } catch {
-    showToast('入库登记失败', 'error')
+  } catch (e: any) {
+    showToast('入库登记失败：' + (e?.message || '请重试'), 'error')
   } finally {
     submitLoading.value = false
   }
@@ -127,6 +174,7 @@ const changePage = (p: number) => {
 }
 
 onMounted(() => {
+  fetchCategories()
   fetchRecords()
   fetchParts()
 })
@@ -146,19 +194,27 @@ onMounted(() => {
         >
           <option :value="null">-- 新建配件 --</option>
           <option v-for="p in parts" :key="p.id" :value="p.id">
-            {{ p.name }} ({{ p.model }}) - 库存: {{ p.current_stock }}
+            [{{ p.category_name || '未分类' }}] {{ p.name }} ({{ p.model }}) - 库存: {{ p.current_stock }}
           </option>
         </select>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div v-if="isNewPart">
-          <label class="block text-sm font-medium text-gray-600 mb-1">配件名称</label>
+          <label class="block text-sm font-medium text-gray-600 mb-1"><span class="text-danger">*</span> 配件类别</label>
+          <select v-model="form.category_id"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <option :value="0">请选择类别</option>
+            <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+          </select>
+        </div>
+        <div v-if="isNewPart">
+          <label class="block text-sm font-medium text-gray-600 mb-1"><span class="text-danger">*</span> 配件名称</label>
           <input v-model="form.name" type="text" placeholder="请输入配件名称"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
         </div>
         <div v-if="isNewPart">
-          <label class="block text-sm font-medium text-gray-600 mb-1">配件型号</label>
+          <label class="block text-sm font-medium text-gray-600 mb-1"><span class="text-danger">*</span> 配件型号</label>
           <input v-model="form.model" type="text" placeholder="请输入配件型号"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
         </div>
@@ -167,20 +223,45 @@ onMounted(() => {
           <input v-model.number="form.quantity" type="number" min="1" placeholder="请输入数量"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
         </div>
-        <div v-if="isNewPart">
-          <label class="block text-sm font-medium text-gray-600 mb-1">货架位置</label>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">{{ isNewPart ? '货架位置' : '货架位置(可选，变更时填写)' }}</label>
           <input v-model="form.shelf_position" type="text" placeholder="如 A-01-03"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-600 mb-1">操作人</label>
+          <label class="block text-sm font-medium text-gray-600 mb-1"><span class="text-danger">*</span> 操作人</label>
           <input v-model="form.operator" type="text" placeholder="请输入操作人"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
         </div>
       </div>
 
+      <div v-if="shelfInfo" class="mt-4 p-4 bg-gray-50 rounded-lg">
+        <div class="flex justify-between text-sm text-gray-600 mb-2">
+          <span>货架配件种类：{{ shelfInfo.part_type_count }} / {{ shelfInfo.max_part_types }}</span>
+          <span>货架库存总量：{{ shelfInfo.total_stock }} / {{ shelfInfo.max_stock_capacity }}</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+          <div class="bg-primary-500 h-1.5 rounded-full transition-all" :style="{ width: shelfTypePercent + '%' }"></div>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+          <div class="h-1.5 rounded-full transition-all"
+            :class="shelfUsagePercent >= 90 ? 'bg-danger' : shelfUsagePercent >= 70 ? 'bg-orange-500' : 'bg-success'"
+            :style="{ width: shelfUsagePercent + '%' }"></div>
+        </div>
+        <p v-if="shelfTypePercent >= 90" class="text-orange-600 text-sm">
+          ⚠️ 该货架配件种类即将达上限
+        </p>
+        <p v-if="shelfUsagePercent >= 90" class="text-danger text-sm">
+          ⚠️ 该货架库存容量即将达上限
+        </p>
+      </div>
+
       <div v-if="!isNewPart && selectedPart" class="mt-4 p-4 bg-primary-50 rounded-lg">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div>
+            <span class="text-gray-500">类别：</span>
+            <span class="font-medium text-gray-800">{{ selectedPart.category_name || '-' }}</span>
+          </div>
           <div>
             <span class="text-gray-500">型号：</span>
             <span class="font-medium text-gray-800">{{ selectedPart.model || '-' }}</span>

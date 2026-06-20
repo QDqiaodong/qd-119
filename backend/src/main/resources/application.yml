@@ -1,6 +1,10 @@
 server:
   port: 8103
 
+shelf:
+  max-part-types: 10
+  max-stock-capacity: 5000
+
 spring:
   jackson:
     property-naming-strategy: SNAKE_CASE

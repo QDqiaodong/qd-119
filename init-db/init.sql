@@ -2,8 +2,29 @@ CREATE DATABASE IF NOT EXISTS buckle_inventory DEFAULT CHARACTER SET utf8mb4 COL
 
 USE buckle_inventory;
 
+CREATE TABLE IF NOT EXISTS accessory_category (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL COMMENT '类别名称',
+    code VARCHAR(30) NOT NULL COMMENT '类别编码',
+    description VARCHAR(200) COMMENT '类别描述',
+    sort_order INT NOT NULL DEFAULT 0 COMMENT '排序',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_code (code),
+    INDEX idx_name (name)
+) ENGINE=InnoDB COMMENT='配件类别表';
+
+INSERT INTO accessory_category (name, code, description, sort_order) VALUES
+('卡扣', 'BUCKLE', '包装机卡扣类配件', 1),
+('固定支架', 'BRACKET', '包装机固定支架类配件', 2),
+('联接片', 'CONNECTOR', '包装机联接片类配件', 3),
+('压板', 'PRESSURE_PLATE', '包装机压板类配件', 4),
+('其他', 'OTHER', '其他包装机配件', 99)
+ON DUPLICATE KEY UPDATE name=VALUES(name);
+
 CREATE TABLE IF NOT EXISTS part (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    category_id BIGINT NOT NULL COMMENT '配件类别ID',
     name VARCHAR(100) NOT NULL COMMENT '配件名称',
     model VARCHAR(100) NOT NULL COMMENT '配件型号',
     total_quantity INT NOT NULL DEFAULT 0 COMMENT '入库总量',
@@ -15,7 +36,8 @@ CREATE TABLE IF NOT EXISTS part (
     INDEX idx_name (name),
     INDEX idx_model (model),
     INDEX idx_shelf (shelf_position),
-    INDEX idx_deleted (deleted)
+    INDEX idx_deleted (deleted),
+    INDEX idx_category_id (category_id)
 ) ENGINE=InnoDB COMMENT='配件信息表';
 
 CREATE TABLE IF NOT EXISTS inbound_record (

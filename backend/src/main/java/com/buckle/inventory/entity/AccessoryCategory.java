@@ -13,8 +13,8 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("part")
-public class Part {
+@TableName("accessory_category")
+public class AccessoryCategory {
 
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -22,26 +22,14 @@ public class Part {
     @TableField("name")
     private String name;
 
-    @TableField("model")
-    private String model;
+    @TableField("code")
+    private String code;
 
-    @TableField("total_quantity")
-    private Integer totalQuantity;
+    @TableField("description")
+    private String description;
 
-    @TableField("current_stock")
-    private Integer currentStock;
-
-    @TableField("category_id")
-    private Long categoryId;
-
-    @TableField(exist = false)
-    private String categoryName;
-
-    @TableField("shelf_position")
-    private String shelfPosition;
-
-    @TableField("deleted")
-    private Integer deleted;
+    @TableField("sort_order")
+    private Integer sortOrder;
 
     @TableField("created_at")
     private LocalDateTime createdAt;

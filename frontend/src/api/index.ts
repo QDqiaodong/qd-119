@@ -15,12 +15,30 @@ http.interceptors.response.use(
 
 export interface Part {
   id: number
+  category_id: number
+  category_name?: string
   name: string
   model: string
   total_quantity: number
   current_stock: number
   shelf_position: string
   updated_at: string
+}
+
+export interface AccessoryCategory {
+  id: number
+  name: string
+  code: string
+  description?: string
+  sort_order: number
+}
+
+export interface ShelfOccupancyInfo {
+  shelf_position: string
+  part_type_count: number
+  total_stock: number
+  max_part_types: number
+  max_stock_capacity: number
 }
 
 export interface InboundRecord {
@@ -123,8 +141,21 @@ export const partsApi = {
 
 export const inboundApi = {
   list: (params?: Record<string, unknown>) => http.get<any, PageResult<InboundRecord>>('/api/inbound', { params }),
-  create: (data: { part_id?: number; part_name?: string; part_model?: string; quantity: number; shelf_position?: string; operator: string }) =>
+  create: (data: { part_id?: number; category_id?: number; part_name?: string; part_model?: string; quantity: number; shelf_position?: string; operator: string }) =>
     http.post<any, InboundRecord>('/api/inbound', data),
+}
+
+export const accessoryCategoryApi = {
+  list: () => http.get<any, AccessoryCategory[]>('/api/accessory-categories'),
+  getById: (id: number) => http.get<any, AccessoryCategory>(`/api/accessory-categories/${id}`),
+  create: (data: Partial<AccessoryCategory>) => http.post<any, AccessoryCategory>('/api/accessory-categories', data),
+  update: (id: number, data: Partial<AccessoryCategory>) => http.put<any, AccessoryCategory>(`/api/accessory-categories/${id}`, data),
+  remove: (id: number) => http.delete(`/api/accessory-categories/${id}`),
+}
+
+export const shelfOccupancyApi = {
+  getByPosition: (shelfPosition: string) => http.get<any, ShelfOccupancyInfo>(`/api/shelf-occupancy/${shelfPosition}`),
+  getConfig: () => http.get<any, ShelfOccupancyInfo>('/api/shelf-occupancy/config'),
 }
 
 export const outboundApi = {

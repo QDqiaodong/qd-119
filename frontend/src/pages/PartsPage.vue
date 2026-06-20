@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Plus, Search, Edit, Trash2, Loader2, PackagePlus, X } from 'lucide-vue-next'
-import { partsApi, inboundApi, type Part } from '@/api'
+import { partsApi, inboundApi, accessoryCategoryApi, shelfOccupancyApi, type Part, type AccessoryCategory, type ShelfOccupancyInfo } from '@/api'
 import Toast from '@/components/Toast.vue'
 
 const loading = ref(true)
@@ -9,6 +9,9 @@ const parts = ref<Part[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 10
+
+const categories = ref<AccessoryCategory[]>([])
+const shelfInfo = ref<ShelfOccupancyInfo | null>(null)
 
 const toastVisible = ref(false)
 const toastMessage = ref('')
@@ -23,6 +26,7 @@ const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') 
 const searchName = ref('')
 const searchModel = ref('')
 const searchShelf = ref('')
+const searchCategoryId = ref<number | null>(null)
 
 const selectedIds = ref<number[]>([])
 const showModal = ref(false)
@@ -40,11 +44,38 @@ const selectedParts = computed(() =>
 )
 
 const form = ref({
+  category_id: 0,
   name: '',
   model: '',
   total_quantity: 0,
   current_stock: 0,
   shelf_position: '',
+})
+
+watch(() => form.value.shelf_position, async (pos) => {
+  if (pos && pos.trim()) {
+    try {
+      shelfInfo.value = await shelfOccupancyApi.getByPosition(encodeURIComponent(pos))
+    } catch {
+      shelfInfo.value = null
+    }
+  } else {
+    shelfInfo.value = null
+  }
+})
+
+const shelfUsagePercent = computed(() => {
+  if (!shelfInfo.value) return 0
+  return shelfInfo.value.max_stock_capacity > 0
+    ? Math.min(100, (shelfInfo.value.total_stock / shelfInfo.value.max_stock_capacity) * 100)
+    : 0
+})
+
+const shelfTypePercent = computed(() => {
+  if (!shelfInfo.value) return 0
+  return shelfInfo.value.max_part_types > 0
+    ? Math.min(100, (shelfInfo.value.part_type_count / shelfInfo.value.max_part_types) * 100)
+    : 0
 })
 
 const isAllSelected = computed(() =>
@@ -92,28 +123,36 @@ const stockLabelText = (p: Part) => stockLevelMeta[stockLevel(p)].text
 
 const openAddModal = () => {
   editingPart.value = null
-  form.value = { name: '', model: '', total_quantity: 0, current_stock: 0, shelf_position: '' }
+  form.value = { category_id: 0, name: '', model: '', total_quantity: 0, current_stock: 0, shelf_position: '' }
+  shelfInfo.value = null
   showModal.value = true
 }
 
 const openEditModal = (part: Part) => {
   editingPart.value = part
   form.value = {
+    category_id: part.category_id,
     name: part.name,
     model: part.model,
     total_quantity: part.total_quantity,
     current_stock: part.current_stock,
     shelf_position: part.shelf_position,
   }
+  shelfInfo.value = null
   showModal.value = true
 }
 
 const closeModal = () => {
   showModal.value = false
   editingPart.value = null
+  shelfInfo.value = null
 }
 
 const onModalSubmit = async () => {
+  if (!form.value.category_id) {
+    showToast('请选择配件类别', 'error')
+    return
+  }
   if (!form.value.name || !form.value.model) {
     showToast('请填写配件名称和型号', 'error')
     return
@@ -131,8 +170,8 @@ const onModalSubmit = async () => {
     }
     closeModal()
     await fetchParts()
-  } catch {
-    showToast(editingPart.value ? '更新失败' : '添加失败', 'error')
+  } catch (e: any) {
+    showToast((editingPart.value ? '更新失败：' : '添加失败：') + (e?.message || '请重试'), 'error')
   } finally {
     modalLoading.value = false
   }
@@ -195,8 +234,8 @@ const onBatchInboundSubmit = async () => {
     showBatchInboundModal.value = false
     selectedIds.value = []
     await fetchParts()
-  } catch {
-    showToast('批量入库失败', 'error')
+  } catch (e: any) {
+    showToast('批量入库失败：' + (e?.message || '请重试'), 'error')
   } finally {
     batchSubmitting.value = false
   }
@@ -211,6 +250,7 @@ const fetchParts = async () => {
       name: searchName.value || undefined,
       model: searchModel.value || undefined,
       shelfPosition: searchShelf.value || undefined,
+      categoryId: searchCategoryId.value || undefined,
     })
     parts.value = res.list ?? []
     total.value = res.total ?? 0
@@ -218,6 +258,14 @@ const fetchParts = async () => {
     parts.value = []
   } finally {
     loading.value = false
+  }
+}
+
+const fetchCategories = async () => {
+  try {
+    categories.value = await accessoryCategoryApi.list()
+  } catch {
+    categories.value = []
   }
 }
 
@@ -236,7 +284,10 @@ const changePage = (p: number) => {
   fetchParts()
 }
 
-onMounted(() => fetchParts())
+onMounted(() => {
+  fetchCategories()
+  fetchParts()
+})
 </script>
 
 <template>
@@ -251,6 +302,14 @@ onMounted(() => fetchParts())
 
     <div class="bg-white rounded-lg shadow p-4 mb-4">
       <div class="flex flex-wrap items-end gap-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">配件类别</label>
+          <select v-model="searchCategoryId"
+            class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <option :value="null">全部类别</option>
+            <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+          </select>
+        </div>
         <div>
           <label class="block text-xs text-gray-500 mb-1">配件名称</label>
           <input v-model="searchName" type="text" placeholder="搜索名称"
@@ -297,6 +356,7 @@ onMounted(() => fetchParts())
                     class="rounded border-gray-300 text-primary-800 focus:ring-primary-500" />
                 </th>
                 <th class="text-left py-3 px-3 font-medium">序号</th>
+                <th class="text-left py-3 px-3 font-medium">类别</th>
                 <th class="text-left py-3 px-3 font-medium">配件名称</th>
                 <th class="text-left py-3 px-3 font-medium">型号</th>
                 <th class="text-left py-3 px-3 font-medium">入库总量</th>
@@ -308,7 +368,7 @@ onMounted(() => fetchParts())
             </thead>
             <tbody :key="page">
               <tr v-if="parts.length === 0">
-                <td colspan="9" class="text-center py-8 text-gray-400">暂无配件数据</td>
+                <td colspan="10" class="text-center py-8 text-gray-400">暂无配件数据</td>
               </tr>
               <tr v-for="(p, i) in parts" :key="p.id"
                 class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
@@ -317,6 +377,13 @@ onMounted(() => fetchParts())
                     class="rounded border-gray-300 text-primary-800 focus:ring-primary-500" />
                 </td>
                 <td class="py-3 px-3">{{ (page - 1) * pageSize + i + 1 }}</td>
+                <td class="py-3 px-3">
+                  <span v-if="p.category_name"
+                    class="inline-block px-2 py-0.5 rounded text-xs bg-primary-100 text-primary-700">
+                    {{ p.category_name }}
+                  </span>
+                  <span v-else class="text-gray-400">-</span>
+                </td>
                 <td class="py-3 px-3 text-gray-800 font-medium">{{ p.name }}</td>
                 <td class="py-3 px-3">{{ p.model }}</td>
                 <td class="py-3 px-3">{{ p.total_quantity }}</td>
@@ -370,17 +437,25 @@ onMounted(() => fetchParts())
           </div>
           <div class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-600 mb-1">配件名称</label>
+              <label class="block text-sm font-medium text-gray-600 mb-1"><span class="text-danger">*</span> 配件类别</label>
+              <select v-model="form.category_id"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option :value="0">请选择类别</option>
+                <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-600 mb-1"><span class="text-danger">*</span> 配件名称</label>
               <input v-model="form.name" type="text" placeholder="请输入配件名称"
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-600 mb-1">配件型号</label>
+              <label class="block text-sm font-medium text-gray-600 mb-1"><span class="text-danger">*</span> 配件型号</label>
               <input v-model="form.model" type="text" placeholder="请输入配件型号"
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-600 mb-1">入库总量</label>
+            <div v-if="!editingPart">
+              <label class="block text-sm font-medium text-gray-600 mb-1">初始入库总量</label>
               <input v-model.number="form.total_quantity" type="number" min="0" placeholder="请输入总量"
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
             </div>
@@ -388,6 +463,26 @@ onMounted(() => fetchParts())
               <label class="block text-sm font-medium text-gray-600 mb-1">货架位置</label>
               <input v-model="form.shelf_position" type="text" placeholder="如 A-01-03"
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <div v-if="shelfInfo" class="mt-2 p-3 bg-gray-50 rounded-lg text-xs space-y-2">
+                <div class="flex justify-between text-gray-600">
+                  <span>配件种类：{{ shelfInfo.part_type_count }} / {{ shelfInfo.max_part_types }}</span>
+                  <span>库存总量：{{ shelfInfo.total_stock }} / {{ shelfInfo.max_stock_capacity }}</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-1.5">
+                  <div class="bg-primary-500 h-1.5 rounded-full transition-all" :style="{ width: shelfTypePercent + '%' }"></div>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-1.5">
+                  <div class="h-1.5 rounded-full transition-all"
+                    :class="shelfUsagePercent >= 90 ? 'bg-danger' : shelfUsagePercent >= 70 ? 'bg-orange-500' : 'bg-success'"
+                    :style="{ width: shelfUsagePercent + '%' }"></div>
+                </div>
+                <p v-if="shelfTypePercent >= 90" class="text-orange-600">
+                  ⚠️ 该货架配件种类即将达上限
+                </p>
+                <p v-if="shelfUsagePercent >= 90" class="text-danger">
+                  ⚠️ 该货架库存容量即将达上限
+                </p>
+              </div>
             </div>
           </div>
           <div class="flex justify-end gap-3 mt-6">
@@ -419,6 +514,7 @@ onMounted(() => fetchParts())
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-gray-200 text-gray-500">
+                  <th class="text-left py-2 px-2 font-medium">类别</th>
                   <th class="text-left py-2 px-2 font-medium">配件名称</th>
                   <th class="text-left py-2 px-2 font-medium">型号</th>
                   <th class="text-left py-2 px-2 font-medium">当前库存</th>
@@ -427,6 +523,11 @@ onMounted(() => fetchParts())
               </thead>
               <tbody>
                 <tr v-for="p in selectedParts" :key="p.id" class="border-b border-gray-100">
+                  <td class="py-2 px-2">
+                    <span v-if="p.category_name" class="inline-block px-2 py-0.5 rounded text-xs bg-primary-100 text-primary-700">
+                      {{ p.category_name }}
+                    </span>
+                  </td>
                   <td class="py-2 px-2 text-gray-800 font-medium">{{ p.name }}</td>
                   <td class="py-2 px-2">{{ p.model }}</td>
                   <td class="py-2 px-2">{{ p.current_stock }}</td>

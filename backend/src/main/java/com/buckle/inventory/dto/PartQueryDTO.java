@@ -14,4 +14,5 @@ public class PartQueryDTO {
     private String name;
     private String model;
     private String shelfPosition;
+    private Long categoryId;
 }

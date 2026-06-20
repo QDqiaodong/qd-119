@@ -7,13 +7,15 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class InboundRequest {
+public class ShelfOccupancyInfo {
 
-    private Long partId;
-    private Long categoryId;
-    private Integer quantity;
     private String shelfPosition;
-    private String operator;
-    private String partName;
-    private String partModel;
+
+    private Integer partTypeCount;
+
+    private Integer totalStock;
+
+    private Integer maxPartTypes;
+
+    private Integer maxStockCapacity;
 }

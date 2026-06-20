@@ -71,6 +71,7 @@ const cardBgClass = (b: BucklePart) => stockLevelMeta[stockLevel(b)].bg
 const mockBuckles: BucklePart[] = [
   {
     id: 1,
+    category_id: 1,
     name: '包装机卡扣',
     model: 'KK-001-S',
     total_quantity: 500,
@@ -82,6 +83,7 @@ const mockBuckles: BucklePart[] = [
   },
   {
     id: 2,
+    category_id: 1,
     name: '包装机卡扣',
     model: 'KK-002-M',
     total_quantity: 500,
@@ -93,6 +95,7 @@ const mockBuckles: BucklePart[] = [
   },
   {
     id: 3,
+    category_id: 1,
     name: '包装机卡扣',
     model: 'KK-003-L',
     total_quantity: 500,
@@ -104,6 +107,7 @@ const mockBuckles: BucklePart[] = [
   },
   {
     id: 4,
+    category_id: 1,
     name: '包装机卡扣',
     model: 'KK-004-XL',
     total_quantity: 300,
@@ -115,6 +119,7 @@ const mockBuckles: BucklePart[] = [
   },
   {
     id: 5,
+    category_id: 1,
     name: '包装机卡扣',
     model: 'KK-005-S',
     total_quantity: 600,
@@ -126,6 +131,7 @@ const mockBuckles: BucklePart[] = [
   },
   {
     id: 6,
+    category_id: 1,
     name: '包装机卡扣',
     model: 'KK-006-M',
     total_quantity: 400,
@@ -137,6 +143,7 @@ const mockBuckles: BucklePart[] = [
   },
   {
     id: 7,
+    category_id: 1,
     name: '包装机卡扣',
     model: 'KK-007-L',
     total_quantity: 500,
@@ -148,6 +155,7 @@ const mockBuckles: BucklePart[] = [
   },
   {
     id: 8,
+    category_id: 1,
     name: '包装机卡扣',
     model: 'KK-008-XL',
     total_quantity: 350,

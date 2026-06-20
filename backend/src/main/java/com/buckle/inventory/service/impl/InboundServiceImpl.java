@@ -4,16 +4,19 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.buckle.inventory.dto.InboundRequest;
 import com.buckle.inventory.dto.PageResult;
+import com.buckle.inventory.entity.AccessoryCategory;
 import com.buckle.inventory.entity.InboundRecord;
 import com.buckle.inventory.entity.OutboundRecord;
 import com.buckle.inventory.entity.Part;
 import com.buckle.inventory.entity.ScrapRecord;
+import com.buckle.inventory.mapper.AccessoryCategoryMapper;
 import com.buckle.inventory.mapper.InboundRecordMapper;
 import com.buckle.inventory.mapper.OutboundRecordMapper;
 import com.buckle.inventory.mapper.PartMapper;
 import com.buckle.inventory.mapper.ScrapRecordMapper;
 import com.buckle.inventory.service.InboundService;
 import com.buckle.inventory.service.RedisCacheService;
+import com.buckle.inventory.service.ShelfOccupancyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +43,12 @@ public class InboundServiceImpl implements InboundService {
 
     @Autowired
     private RedisCacheService redisCacheService;
+
+    @Autowired
+    private AccessoryCategoryMapper categoryMapper;
+
+    @Autowired
+    private ShelfOccupancyService shelfOccupancyService;
 
     @Override
     public PageResult<InboundRecord> listInbound(int page, int size, String keyword) {
@@ -106,6 +115,14 @@ public class InboundServiceImpl implements InboundService {
                 throw new RuntimeException("配件已删除，无法入库");
             }
 
+            String targetShelf = StringUtils.hasText(request.getShelfPosition())
+                    ? request.getShelfPosition()
+                    : part.getShelfPosition();
+            boolean shelfChanged = StringUtils.hasText(targetShelf)
+                    && !targetShelf.equals(part.getShelfPosition());
+            boolean isNewTypeForShelf = shelfChanged;
+            shelfOccupancyService.checkCapacity(targetShelf, inboundQuantity, isNewTypeForShelf);
+
             int oldTotal = part.getTotalQuantity() != null ? part.getTotalQuantity() : 0;
             int oldStock = part.getCurrentStock() != null ? part.getCurrentStock() : 0;
 
@@ -130,14 +147,27 @@ public class InboundServiceImpl implements InboundService {
 
             verifyPartConsistency(part.getId(), newTotal, newStock);
         } else if (StringUtils.hasText(request.getPartName()) && StringUtils.hasText(request.getPartModel())) {
+            if (request.getCategoryId() == null) {
+                throw new RuntimeException("请选择配件类别");
+            }
+            AccessoryCategory category = categoryMapper.selectById(request.getCategoryId());
+            if (category == null) {
+                throw new RuntimeException("配件类别不存在");
+            }
+
+            String targetShelf = request.getShelfPosition() != null ? request.getShelfPosition() : "";
+            shelfOccupancyService.checkCapacity(targetShelf, inboundQuantity, true);
+
             part = new Part();
+            part.setCategoryId(request.getCategoryId());
             part.setName(request.getPartName().trim());
             part.setModel(request.getPartModel().trim());
             part.setTotalQuantity(inboundQuantity);
             part.setCurrentStock(inboundQuantity);
-            part.setShelfPosition(request.getShelfPosition() != null ? request.getShelfPosition() : "");
+            part.setShelfPosition(targetShelf);
             part.setCreatedAt(LocalDateTime.now());
             part.setUpdatedAt(LocalDateTime.now());
+            part.setDeleted(0);
             partMapper.insert(part);
 
             if (part.getId() == null) {

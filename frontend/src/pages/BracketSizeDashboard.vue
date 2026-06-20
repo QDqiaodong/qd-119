@@ -41,6 +41,7 @@ const stockLevelMeta: Record<StockLevel, { number: string; label: string; text: 
 const mockBrackets: BracketPart[] = [
   {
     id: 1,
+    category_id: 2,
     name: '固定支架',
     model: 'ZJ-100-20',
     total_quantity: 100,
@@ -54,6 +55,7 @@ const mockBrackets: BracketPart[] = [
   },
   {
     id: 2,
+    category_id: 2,
     name: '固定支架',
     model: 'ZJ-100-25',
     total_quantity: 80,
@@ -67,6 +69,7 @@ const mockBrackets: BracketPart[] = [
   },
   {
     id: 3,
+    category_id: 2,
     name: '固定支架',
     model: 'ZJ-150-20',
     total_quantity: 60,
@@ -80,6 +83,7 @@ const mockBrackets: BracketPart[] = [
   },
   {
     id: 4,
+    category_id: 2,
     name: '固定支架',
     model: 'ZJ-150-30',
     total_quantity: 50,
@@ -93,6 +97,7 @@ const mockBrackets: BracketPart[] = [
   },
   {
     id: 5,
+    category_id: 2,
     name: '固定支架',
     model: 'ZJ-200-25',
     total_quantity: 70,
@@ -106,6 +111,7 @@ const mockBrackets: BracketPart[] = [
   },
   {
     id: 6,
+    category_id: 2,
     name: '固定支架',
     model: 'ZJ-200-30',
     total_quantity: 40,
@@ -119,6 +125,7 @@ const mockBrackets: BracketPart[] = [
   },
   {
     id: 7,
+    category_id: 2,
     name: '固定支架',
     model: 'ZJ-250-30',
     total_quantity: 30,
@@ -132,6 +139,7 @@ const mockBrackets: BracketPart[] = [
   },
   {
     id: 8,
+    category_id: 2,
     name: '固定支架',
     model: 'ZJ-250-40',
     total_quantity: 25,
@@ -145,6 +153,7 @@ const mockBrackets: BracketPart[] = [
   },
   {
     id: 9,
+    category_id: 2,
     name: '固定支架',
     model: 'ZJ-300-30',
     total_quantity: 20,
@@ -158,6 +167,7 @@ const mockBrackets: BracketPart[] = [
   },
   {
     id: 10,
+    category_id: 2,
     name: '固定支架',
     model: 'ZJ-300-40',
     total_quantity: 15,
