@@ -8,11 +8,9 @@ COPY settings.xml /root/.m2/settings.xml
 
 COPY pom.xml .
 
-RUN mvn dependency:go-offline -B
-
 COPY src ./src
 
-RUN mvn package -DskipTests -B
+RUN mvn package -Dmaven.test.skip=true -B
 
 FROM ${DOCKER_REGISTRY}/library/eclipse-temurin:17-jre-jammy
 
