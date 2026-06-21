@@ -32,7 +32,9 @@ public class RedisCacheServiceImpl implements RedisCacheService {
     private static final String BUCKLES_CACHE_KEY = "parts:buckles";
     private static final String BRACKETS_CACHE_KEY = "parts:brackets";
     private static final String DASHBOARD_OVERVIEW_KEY = "dashboard:overview";
+    private static final String OUTBOUND_IDEMPOTENT_PREFIX = "outbound:idempotent:";
     private static final long CACHE_TTL_MINUTES = 30;
+    private static final long OUTBOUND_IDEMPOTENT_TTL_SECONDS = 10;
 
     private void probe(String action, String key, Object value) {
         log.info("[CACHE_PROBE] action={} key={} value={}", action, key, value);
@@ -312,6 +314,45 @@ public class RedisCacheServiceImpl implements RedisCacheService {
         evictBucklesCache();
         evictBracketsCache();
         evictDashboardOverviewCache();
+    }
+
+    @Override
+    public Long getOutboundIdempotentRecord(String key) {
+        if (!StringUtils.hasText(key)) {
+            return null;
+        }
+        String cacheKey = OUTBOUND_IDEMPOTENT_PREFIX + key;
+        Object cached = null;
+        try {
+            cached = redisTemplate.opsForValue().get(cacheKey);
+        } catch (Exception e) {
+            probe("READ_ERROR", cacheKey, e.getMessage());
+        }
+        if (cached != null) {
+            try {
+                Long recordId = Long.valueOf(cached.toString());
+                probe("HIT", cacheKey, "recordId=" + recordId);
+                return recordId;
+            } catch (Exception e) {
+                probe("DESERIALIZE_FAIL", cacheKey, e.getMessage());
+                try { redisTemplate.delete(cacheKey); } catch (Exception ignored) {}
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void setOutboundIdempotentRecord(String key, Long recordId) {
+        if (!StringUtils.hasText(key) || recordId == null) {
+            return;
+        }
+        String cacheKey = OUTBOUND_IDEMPOTENT_PREFIX + key;
+        try {
+            redisTemplate.opsForValue().set(cacheKey, recordId, OUTBOUND_IDEMPOTENT_TTL_SECONDS, TimeUnit.SECONDS);
+            probe("WRITE", cacheKey, "recordId=" + recordId + "|TTL=" + OUTBOUND_IDEMPOTENT_TTL_SECONDS + "s");
+        } catch (Exception e) {
+            probe("WRITE_FAIL", cacheKey, e.getMessage());
+        }
     }
 
     private List<Part> refreshAndReturn() {

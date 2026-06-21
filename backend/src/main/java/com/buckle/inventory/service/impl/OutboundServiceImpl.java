@@ -10,6 +10,8 @@ import com.buckle.inventory.mapper.OutboundRecordMapper;
 import com.buckle.inventory.mapper.PartMapper;
 import com.buckle.inventory.service.OutboundService;
 import com.buckle.inventory.service.RedisCacheService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +21,8 @@ import java.time.LocalDateTime;
 
 @Service
 public class OutboundServiceImpl implements OutboundService {
+
+    private static final Logger log = LoggerFactory.getLogger(OutboundServiceImpl.class);
 
     @Autowired
     private OutboundRecordMapper outboundRecordMapper;
@@ -67,6 +71,17 @@ public class OutboundServiceImpl implements OutboundService {
     public OutboundRecord addOutbound(OutboundRequest request) {
         validateRequest(request);
 
+        String idempotentKey = generateIdempotentKey(request);
+        Long existingRecordId = redisCacheService.getOutboundIdempotentRecord(idempotentKey);
+        if (existingRecordId != null) {
+            OutboundRecord existingRecord = outboundRecordMapper.selectById(existingRecordId);
+            if (existingRecord != null) {
+                log.info("[addOutbound] idempotent hit, returning existing record: key={}, recordId={}",
+                        idempotentKey, existingRecordId);
+                return existingRecord;
+            }
+        }
+
         Part part = partMapper.selectById(request.getPartId());
         if (part == null) {
             throw new RuntimeException("配件不存在");
@@ -100,6 +115,8 @@ public class OutboundServiceImpl implements OutboundService {
         record.setPartModel(updatedPart.getModel());
         outboundRecordMapper.insert(record);
 
+        redisCacheService.setOutboundIdempotentRecord(idempotentKey, record.getId());
+
         redisCacheService.evictPartRelatedCache(updatedPart.getId(), null, null,
                 updatedPart.getShelfPosition(), updatedPart.getCategoryId());
         return record;
@@ -118,5 +135,12 @@ public class OutboundServiceImpl implements OutboundService {
         if (!StringUtils.hasText(request.getOperator())) {
             throw new RuntimeException("操作人不能为空");
         }
+    }
+
+    private String generateIdempotentKey(OutboundRequest request) {
+        String productionLine = StringUtils.hasText(request.getProductionLine()) ? request.getProductionLine() : "";
+        String partId = request.getPartId() != null ? request.getPartId().toString() : "";
+        String quantity = request.getQuantity() != null ? request.getQuantity().toString() : "";
+        return productionLine + ":" + partId + ":" + quantity;
     }
 }

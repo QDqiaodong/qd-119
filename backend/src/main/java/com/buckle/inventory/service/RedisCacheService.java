@@ -47,4 +47,8 @@ public interface RedisCacheService {
     void evictDashboardOverviewCache();
 
     void evictAllInventoryRelatedCache();
+
+    Long getOutboundIdempotentRecord(String key);
+
+    void setOutboundIdempotentRecord(String key, Long recordId);
 }
