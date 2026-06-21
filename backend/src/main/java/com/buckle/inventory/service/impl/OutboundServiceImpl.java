@@ -9,6 +9,7 @@ import com.buckle.inventory.entity.Part;
 import com.buckle.inventory.mapper.OutboundRecordMapper;
 import com.buckle.inventory.mapper.PartMapper;
 import com.buckle.inventory.service.OutboundService;
+import com.buckle.inventory.service.RedisCacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,9 @@ public class OutboundServiceImpl implements OutboundService {
 
     @Autowired
     private PartMapper partMapper;
+
+    @Autowired
+    private RedisCacheService redisCacheService;
 
     @Override
     public PageResult<OutboundRecord> listOutbound(int page, int size, String productionLine) {
@@ -88,6 +92,8 @@ public class OutboundServiceImpl implements OutboundService {
         record.setPartModel(part.getModel());
         outboundRecordMapper.insert(record);
 
+        redisCacheService.evictPartRelatedCache(part.getId(), null, null,
+                part.getShelfPosition(), part.getCategoryId());
         return record;
     }
 

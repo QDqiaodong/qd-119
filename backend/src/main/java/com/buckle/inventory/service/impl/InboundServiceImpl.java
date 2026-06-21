@@ -191,7 +191,8 @@ public class InboundServiceImpl implements InboundService {
             throw new RuntimeException("记录入库流水失败");
         }
 
-        redisCacheService.refreshPartsCache();
+        redisCacheService.evictPartRelatedCache(part.getId(), null, null,
+                part.getShelfPosition(), part.getCategoryId());
         return record;
     }
 

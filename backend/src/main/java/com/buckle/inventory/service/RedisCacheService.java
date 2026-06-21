@@ -11,4 +11,17 @@ public interface RedisCacheService {
     List<Part> getPartsFromCache();
 
     void evictPartsCache();
+
+    List<Part> getPartsByShelfPosition(String shelfPosition);
+
+    List<Part> getPartsByCategoryId(Long categoryId);
+
+    void evictPartsByShelfPosition(String shelfPosition);
+
+    void evictPartsByCategoryId(Long categoryId);
+
+    void evictPartRelatedCache(Part part);
+
+    void evictPartRelatedCache(Long partId, String oldShelfPosition, Long oldCategoryId,
+                               String newShelfPosition, Long newCategoryId);
 }

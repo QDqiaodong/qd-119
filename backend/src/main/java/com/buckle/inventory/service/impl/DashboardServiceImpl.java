@@ -1,14 +1,16 @@
 package com.buckle.inventory.service.impl;
 
+import com.buckle.inventory.dto.ActivityEvent;
 import com.buckle.inventory.dto.DashboardOverview;
 import com.buckle.inventory.dto.RecentActivity;
 import com.buckle.inventory.entity.InboundRecord;
 import com.buckle.inventory.entity.OutboundRecord;
-import com.buckle.inventory.entity.ScrapRecord;
+import com.buckle.inventory.entity.Part;
 import com.buckle.inventory.mapper.InboundRecordMapper;
 import com.buckle.inventory.mapper.OutboundRecordMapper;
 import com.buckle.inventory.mapper.PartMapper;
 import com.buckle.inventory.mapper.ScrapRecordMapper;
+import com.buckle.inventory.service.ActivityService;
 import com.buckle.inventory.service.DashboardService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -16,7 +18,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -34,14 +35,17 @@ public class DashboardServiceImpl implements DashboardService {
     @Autowired
     private ScrapRecordMapper scrapRecordMapper;
 
+    @Autowired
+    private ActivityService activityService;
+
     @Override
     public DashboardOverview getOverview() {
-        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.buckle.inventory.entity.Part> partWrapper =
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Part> partWrapper =
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-        partWrapper.ne(com.buckle.inventory.entity.Part::getDeleted, 1);
+        partWrapper.ne(Part::getDeleted, 1);
         Long totalParts = partMapper.selectCount(partWrapper);
 
-        List<com.buckle.inventory.entity.Part> allParts = partMapper.selectList(partWrapper);
+        List<Part> allParts = partMapper.selectList(partWrapper);
         int totalStock = allParts.stream().mapToInt(p -> p.getCurrentStock() != null ? p.getCurrentStock() : 0).sum();
 
         LocalDateTime monthStart = YearMonth.now().atDay(1).atStartOfDay();
@@ -64,53 +68,27 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public List<RecentActivity> getRecentActivities() {
+        List<ActivityEvent> events = activityService.getRecentActivities(10);
         List<RecentActivity> activities = new ArrayList<>();
-
-        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<InboundRecord> inboundWrapper =
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-        inboundWrapper.orderByDesc(InboundRecord::getCreatedAt).last("LIMIT 5");
-        List<InboundRecord> inboundRecords = inboundRecordMapper.selectList(inboundWrapper);
-        for (InboundRecord r : inboundRecords) {
-            String partName = r.getPartName();
-            if (partName == null) {
-                com.buckle.inventory.entity.Part part = partMapper.selectById(r.getPartId());
-                partName = (part != null ? part.getName() : "未知配件");
+        for (ActivityEvent event : events) {
+            String type;
+            switch (event.getType()) {
+                case INBOUND:
+                    type = "INBOUND";
+                    break;
+                case OUTBOUND:
+                    type = "OUTBOUND";
+                    break;
+                case SCRAP:
+                    type = "SCRAP";
+                    break;
+                case INVENTORY_CHECK:
+                    type = "INVENTORY_CHECK";
+                    break;
+                default:
+                    type = event.getType().name();
             }
-            String desc = partName + " 入库 " + r.getQuantity() + "个";
-            activities.add(new RecentActivity("INBOUND", desc, r.getCreatedAt(), null));
-        }
-
-        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OutboundRecord> outboundWrapper =
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-        outboundWrapper.orderByDesc(OutboundRecord::getCreatedAt).last("LIMIT 5");
-        List<OutboundRecord> outboundRecords = outboundRecordMapper.selectList(outboundWrapper);
-        for (OutboundRecord r : outboundRecords) {
-            String partName = r.getPartName();
-            if (partName == null) {
-                com.buckle.inventory.entity.Part part = partMapper.selectById(r.getPartId());
-                partName = (part != null ? part.getName() : "未知配件");
-            }
-            String desc = partName + " 出库 " + r.getQuantity() + "个";
-            activities.add(new RecentActivity("OUTBOUND", desc, r.getCreatedAt(), r.getProductionLine()));
-        }
-
-        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ScrapRecord> scrapWrapper =
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-        scrapWrapper.orderByDesc(ScrapRecord::getCreatedAt).last("LIMIT 5");
-        List<ScrapRecord> scrapRecords = scrapRecordMapper.selectList(scrapWrapper);
-        for (ScrapRecord r : scrapRecords) {
-            String partName = r.getPartName();
-            if (partName == null) {
-                com.buckle.inventory.entity.Part part = partMapper.selectById(r.getPartId());
-                partName = (part != null ? part.getName() : "未知配件");
-            }
-            String desc = partName + " 报废 " + r.getQuantity() + "个";
-            activities.add(new RecentActivity("SCRAP", desc, r.getCreatedAt(), null));
-        }
-
-        activities.sort(Comparator.comparing(RecentActivity::getTime).reversed());
-        if (activities.size() > 10) {
-            activities = activities.subList(0, 10);
+            activities.add(new RecentActivity(type, event.getDescription(), event.getTime(), event.getProductionLine()));
         }
         return activities;
     }

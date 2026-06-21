@@ -8,6 +8,7 @@ import com.buckle.inventory.entity.ScrapReasonDict;
 import com.buckle.inventory.entity.ScrapRecord;
 import com.buckle.inventory.mapper.PartMapper;
 import com.buckle.inventory.mapper.ScrapRecordMapper;
+import com.buckle.inventory.service.RedisCacheService;
 import com.buckle.inventory.service.ScrapReasonDictService;
 import com.buckle.inventory.service.ScrapService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +39,9 @@ public class ScrapServiceImpl implements ScrapService {
 
     @Autowired
     private ScrapReasonDictService scrapReasonDictService;
+
+    @Autowired
+    private RedisCacheService redisCacheService;
 
     @Override
     public PageResult<ScrapRecord> listScrap(int page, int size) {
@@ -102,6 +106,8 @@ public class ScrapServiceImpl implements ScrapService {
         record.setPartModel(part.getModel());
         scrapRecordMapper.insert(record);
 
+        redisCacheService.evictPartRelatedCache(part.getId(), null, null,
+                part.getShelfPosition(), part.getCategoryId());
         return record;
     }
 

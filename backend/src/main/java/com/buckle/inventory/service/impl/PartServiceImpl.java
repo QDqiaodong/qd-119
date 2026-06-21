@@ -148,15 +148,20 @@ public class PartServiceImpl implements PartService {
         part.setUpdatedAt(LocalDateTime.now());
         partMapper.insert(part);
         part.setCategoryName(category.getName());
-        redisCacheService.refreshPartsCache();
+        redisCacheService.evictPartRelatedCache(null, null, null,
+                part.getShelfPosition(), part.getCategoryId());
         return part;
     }
 
     @Override
     public Part updatePart(Part part) {
+        Part oldPart = partMapper.selectById(part.getId());
+        String oldShelfPosition = oldPart != null ? oldPart.getShelfPosition() : null;
+        Long oldCategoryId = oldPart != null ? oldPart.getCategoryId() : null;
         part.setUpdatedAt(LocalDateTime.now());
         partMapper.updateById(part);
-        redisCacheService.refreshPartsCache();
+        redisCacheService.evictPartRelatedCache(part.getId(), oldShelfPosition, oldCategoryId,
+                part.getShelfPosition(), part.getCategoryId());
         return part;
     }
 
@@ -181,11 +186,13 @@ public class PartServiceImpl implements PartService {
         }
         Part part = partMapper.selectById(id);
         if (part != null) {
+            String oldShelfPosition = part.getShelfPosition();
+            Long oldCategoryId = part.getCategoryId();
             part.setDeleted(1);
             part.setUpdatedAt(LocalDateTime.now());
             partMapper.updateById(part);
+            redisCacheService.evictPartRelatedCache(id, oldShelfPosition, oldCategoryId, null, null);
         }
-        redisCacheService.refreshPartsCache();
     }
 
     @Override
@@ -248,8 +255,9 @@ public class PartServiceImpl implements PartService {
             part.setUpdatedAt(LocalDateTime.now());
             partMapper.insert(part);
             part.setCategoryName(category.getName());
+            redisCacheService.evictPartRelatedCache(null, null, null,
+                    part.getShelfPosition(), part.getCategoryId());
         }
-        redisCacheService.refreshPartsCache();
         return parts;
     }
 
