@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { PackageMinus, Search, Loader2 } from 'lucide-vue-next'
 import { outboundApi, partsApi, type OutboundRecord, type Part } from '@/api'
 import Toast from '@/components/Toast.vue'
 import ProductionLineBadge from '@/components/ProductionLineBadge.vue'
+import useInventoryRefresh from '@/composables/useInventoryRefresh'
+
+const { inventoryVersion, refreshInventory } = useInventoryRefresh()
 
 const loading = ref(true)
 const submitLoading = ref(false)
@@ -91,8 +94,7 @@ const onSubmit = async () => {
     })
     showToast('出库登记成功')
     resetForm()
-    await fetchRecords()
-    await fetchParts()
+    refreshInventory()
   } catch {
     showToast('出库登记失败', 'error')
   } finally {
@@ -107,6 +109,11 @@ const changePage = (p: number) => {
   page.value = p
   fetchRecords()
 }
+
+watch(inventoryVersion, () => {
+  fetchRecords()
+  fetchParts()
+})
 
 onMounted(() => {
   fetchRecords()

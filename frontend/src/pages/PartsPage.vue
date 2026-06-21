@@ -3,6 +3,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Plus, Search, Edit, Trash2, Loader2, PackagePlus, X } from 'lucide-vue-next'
 import { partsApi, inboundApi, accessoryCategoryApi, shelfOccupancyApi, type Part, type AccessoryCategory, type ShelfOccupancyInfo, type PartDeletionCheck } from '@/api'
 import Toast from '@/components/Toast.vue'
+import useInventoryRefresh from '@/composables/useInventoryRefresh'
+
+const { inventoryVersion, refreshInventory } = useInventoryRefresh()
 
 const loading = ref(true)
 const parts = ref<Part[]>([])
@@ -169,7 +172,7 @@ const onModalSubmit = async () => {
       showToast('配件添加成功')
     }
     closeModal()
-    await fetchParts()
+    refreshInventory()
   } catch (e: any) {
     showToast((editingPart.value ? '更新失败：' : '添加失败：') + (e?.message || '请重试'), 'error')
   } finally {
@@ -209,7 +212,7 @@ const onDelete = async () => {
     showToast('删除成功')
     selectedIds.value = selectedIds.value.filter((i) => i !== deletingPartId.value)
     closeDeleteConfirm()
-    await fetchParts()
+    refreshInventory()
   } catch (e: any) {
     showToast('删除失败：' + (e?.message || '请重试'), 'error')
   } finally {
@@ -259,7 +262,7 @@ const onBatchInboundSubmit = async () => {
     showToast(`已成功为 ${selectedParts.value.length} 个配件入库`)
     showBatchInboundModal.value = false
     selectedIds.value = []
-    await fetchParts()
+    refreshInventory()
   } catch (e: any) {
     showToast('批量入库失败：' + (e?.message || '请重试'), 'error')
   } finally {
@@ -309,6 +312,10 @@ const changePage = (p: number) => {
   selectedIds.value = []
   fetchParts()
 }
+
+watch(inventoryVersion, () => {
+  fetchParts()
+})
 
 onMounted(() => {
   fetchCategories()

@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { Package, Warehouse, TrendingUp, TrendingDown, ArrowRight, Activity } from 'lucide-vue-next'
 import { dashboardApi, type DashboardOverview, type RecentActivity } from '@/api'
 import ProductionLineBadge from '@/components/ProductionLineBadge.vue'
+import useInventoryRefresh from '@/composables/useInventoryRefresh'
+
+const { inventoryVersion } = useInventoryRefresh()
 
 const loading = ref(true)
 const overview = ref<DashboardOverview>({
@@ -32,8 +35,9 @@ const typeLabelMap: Record<string, string> = {
   scrap: '报废',
 }
 
-onMounted(async () => {
+const loadData = async () => {
   try {
+    loading.value = true
     const [overviewData, recentData] = await Promise.all([
       dashboardApi.getOverview(),
       dashboardApi.getRecent(),
@@ -48,6 +52,14 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+}
+
+watch(inventoryVersion, () => {
+  loadData()
+})
+
+onMounted(() => {
+  loadData()
 })
 </script>
 

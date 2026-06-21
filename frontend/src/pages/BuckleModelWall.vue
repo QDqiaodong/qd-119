@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { Package, MapPin, Clock, AlertTriangle, Search, RefreshCw } from 'lucide-vue-next'
 import { buckleApi, type BucklePart } from '@/api'
 import Toast from '@/components/Toast.vue'
+import useInventoryRefresh from '@/composables/useInventoryRefresh'
+
+const { inventoryVersion } = useInventoryRefresh()
 
 const loading = ref(true)
 const buckles = ref<BucklePart[]>([])
@@ -111,6 +114,10 @@ const getStockPercentage = (b: BucklePart) => {
   if (b.total_quantity <= 0) return 0
   return Math.min(100, Math.round((b.current_stock / b.total_quantity) * 100))
 }
+
+watch(inventoryVersion, () => {
+  fetchBuckles()
+})
 
 onMounted(() => fetchBuckles())
 </script>

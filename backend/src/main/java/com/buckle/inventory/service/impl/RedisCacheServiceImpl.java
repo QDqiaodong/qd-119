@@ -1,6 +1,9 @@
 package com.buckle.inventory.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.buckle.inventory.dto.BracketPartDTO;
+import com.buckle.inventory.dto.BucklePartDTO;
+import com.buckle.inventory.dto.DashboardOverview;
 import com.buckle.inventory.entity.Part;
 import com.buckle.inventory.mapper.PartMapper;
 import com.buckle.inventory.service.RedisCacheService;
@@ -22,6 +25,9 @@ public class RedisCacheServiceImpl implements RedisCacheService {
     private static final String PARTS_CACHE_KEY = "parts:common";
     private static final String PARTS_SHELF_PREFIX = "parts:shelf:";
     private static final String PARTS_CATEGORY_PREFIX = "parts:category:";
+    private static final String BUCKLES_CACHE_KEY = "parts:buckles";
+    private static final String BRACKETS_CACHE_KEY = "parts:brackets";
+    private static final String DASHBOARD_OVERVIEW_KEY = "dashboard:overview";
     private static final long CACHE_TTL_MINUTES = 30;
 
     @Autowired
@@ -165,7 +171,99 @@ public class RedisCacheServiceImpl implements RedisCacheService {
         if (newCategoryId != null && !newCategoryId.equals(oldCategoryId)) {
             evictPartsByCategoryId(newCategoryId);
         }
+        evictAllInventoryRelatedCache();
+    }
+
+    @Override
+    public List<BucklePartDTO> getBucklesFromCache() {
+        Object cached = redisTemplate.opsForValue().get(BUCKLES_CACHE_KEY);
+        if (cached != null) {
+            try {
+                return objectMapper.readValue(cached.toString(), new TypeReference<List<BucklePartDTO>>() {});
+            } catch (Exception e) {
+                redisTemplate.delete(BUCKLES_CACHE_KEY);
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void setBucklesCache(List<BucklePartDTO> buckles) {
+        try {
+            redisTemplate.opsForValue().set(BUCKLES_CACHE_KEY, objectMapper.writeValueAsString(buckles),
+                    CACHE_TTL_MINUTES, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            throw new RuntimeException("缓存卡扣列表失败", e);
+        }
+    }
+
+    @Override
+    public List<BracketPartDTO> getBracketsFromCache() {
+        Object cached = redisTemplate.opsForValue().get(BRACKETS_CACHE_KEY);
+        if (cached != null) {
+            try {
+                return objectMapper.readValue(cached.toString(), new TypeReference<List<BracketPartDTO>>() {});
+            } catch (Exception e) {
+                redisTemplate.delete(BRACKETS_CACHE_KEY);
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void setBracketsCache(List<BracketPartDTO> brackets) {
+        try {
+            redisTemplate.opsForValue().set(BRACKETS_CACHE_KEY, objectMapper.writeValueAsString(brackets),
+                    CACHE_TTL_MINUTES, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            throw new RuntimeException("缓存支架列表失败", e);
+        }
+    }
+
+    @Override
+    public DashboardOverview getDashboardOverviewFromCache() {
+        Object cached = redisTemplate.opsForValue().get(DASHBOARD_OVERVIEW_KEY);
+        if (cached != null) {
+            try {
+                return objectMapper.readValue(cached.toString(), DashboardOverview.class);
+            } catch (Exception e) {
+                redisTemplate.delete(DASHBOARD_OVERVIEW_KEY);
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void setDashboardOverviewCache(DashboardOverview overview) {
+        try {
+            redisTemplate.opsForValue().set(DASHBOARD_OVERVIEW_KEY, objectMapper.writeValueAsString(overview),
+                    CACHE_TTL_MINUTES, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            throw new RuntimeException("缓存仪表盘概览失败", e);
+        }
+    }
+
+    @Override
+    public void evictBucklesCache() {
+        redisTemplate.delete(BUCKLES_CACHE_KEY);
+    }
+
+    @Override
+    public void evictBracketsCache() {
+        redisTemplate.delete(BRACKETS_CACHE_KEY);
+    }
+
+    @Override
+    public void evictDashboardOverviewCache() {
+        redisTemplate.delete(DASHBOARD_OVERVIEW_KEY);
+    }
+
+    @Override
+    public void evictAllInventoryRelatedCache() {
         evictPartsCache();
+        evictBucklesCache();
+        evictBracketsCache();
+        evictDashboardOverviewCache();
     }
 
     private List<Part> refreshAndReturn() {

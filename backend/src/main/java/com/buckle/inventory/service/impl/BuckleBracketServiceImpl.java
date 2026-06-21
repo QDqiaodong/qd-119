@@ -12,6 +12,7 @@ import com.buckle.inventory.mapper.InboundRecordMapper;
 import com.buckle.inventory.mapper.OutboundRecordMapper;
 import com.buckle.inventory.mapper.PartMapper;
 import com.buckle.inventory.service.BuckleBracketService;
+import com.buckle.inventory.service.RedisCacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -43,18 +44,33 @@ public class BuckleBracketServiceImpl implements BuckleBracketService {
     @Autowired
     private OutboundRecordMapper outboundRecordMapper;
 
+    @Autowired
+    private RedisCacheService redisCacheService;
+
     @Override
     public List<BucklePartDTO> listBuckles() {
-        return buildParts(BUCKLE_CATEGORY_CODE, false).stream()
+        List<BucklePartDTO> cached = redisCacheService.getBucklesFromCache();
+        if (cached != null) {
+            return cached;
+        }
+        List<BucklePartDTO> result = buildParts(BUCKLE_CATEGORY_CODE, false).stream()
                 .map(dto -> (BucklePartDTO) dto)
                 .collect(Collectors.toList());
+        redisCacheService.setBucklesCache(result);
+        return result;
     }
 
     @Override
     public List<BracketPartDTO> listBrackets() {
-        return buildParts(BRACKET_CATEGORY_CODE, true).stream()
+        List<BracketPartDTO> cached = redisCacheService.getBracketsFromCache();
+        if (cached != null) {
+            return cached;
+        }
+        List<BracketPartDTO> result = buildParts(BRACKET_CATEGORY_CODE, true).stream()
                 .map(dto -> (BracketPartDTO) dto)
                 .collect(Collectors.toList());
+        redisCacheService.setBracketsCache(result);
+        return result;
     }
 
     private List<BucklePartDTO> buildParts(String categoryCode, boolean isBracket) {

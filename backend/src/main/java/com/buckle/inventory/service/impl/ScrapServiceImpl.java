@@ -74,7 +74,7 @@ public class ScrapServiceImpl implements ScrapService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ScrapRecord addScrap(ScrapRequest request) {
         validateRequest(request);
 
@@ -85,13 +85,21 @@ public class ScrapServiceImpl implements ScrapService {
         if (part.getDeleted() != null && part.getDeleted() == 1) {
             throw new RuntimeException("配件已删除，无法报废");
         }
-        if (part.getCurrentStock() < request.getQuantity()) {
-            throw new RuntimeException("库存不足，当前库存: " + part.getCurrentStock());
+
+        int currentStockBefore = part.getCurrentStock() != null ? part.getCurrentStock() : 0;
+        if (currentStockBefore < request.getQuantity()) {
+            throw new RuntimeException("库存不足，当前库存: " + currentStockBefore);
         }
 
-        part.setCurrentStock(part.getCurrentStock() - request.getQuantity());
-        part.setUpdatedAt(LocalDateTime.now());
-        partMapper.updateById(part);
+        LocalDateTime now = LocalDateTime.now();
+        int affected = partMapper.deductStock(request.getPartId(), request.getQuantity(), now);
+        if (affected == 0) {
+            Part latest = partMapper.selectById(request.getPartId());
+            int latestStock = latest != null && latest.getCurrentStock() != null ? latest.getCurrentStock() : 0;
+            throw new RuntimeException("库存不足，当前可用库存: " + latestStock);
+        }
+
+        Part updatedPart = partMapper.selectById(request.getPartId());
 
         String processedReasons = processScrapReasons(request.getReason());
 
@@ -101,13 +109,13 @@ public class ScrapServiceImpl implements ScrapService {
         record.setReason(processedReasons);
         record.setRemark(request.getRemark());
         record.setOperator(request.getOperator());
-        record.setCreatedAt(LocalDateTime.now());
-        record.setPartName(part.getName());
-        record.setPartModel(part.getModel());
+        record.setCreatedAt(now);
+        record.setPartName(updatedPart.getName());
+        record.setPartModel(updatedPart.getModel());
         scrapRecordMapper.insert(record);
 
-        redisCacheService.evictPartRelatedCache(part.getId(), null, null,
-                part.getShelfPosition(), part.getCategoryId());
+        redisCacheService.evictPartRelatedCache(updatedPart.getId(), null, null,
+                updatedPart.getShelfPosition(), updatedPart.getCategoryId());
         return record;
     }
 

@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { Ruler, Grid3X3, Package, MapPin, Clock, RefreshCw, CheckCircle, AlertTriangle, XCircle } from 'lucide-vue-next'
 import { bracketApi, type BracketPart } from '@/api'
 import Toast from '@/components/Toast.vue'
+import useInventoryRefresh from '@/composables/useInventoryRefresh'
+
+const { inventoryVersion } = useInventoryRefresh()
 
 const loading = ref(true)
 const brackets = ref<BracketPart[]>([])
@@ -121,6 +124,10 @@ const getStockPercentage = (b: BracketPart) => {
   if (b.total_quantity <= 0) return 0
   return Math.round((b.current_stock / b.total_quantity) * 100)
 }
+
+watch(inventoryVersion, () => {
+  fetchBrackets()
+})
 
 onMounted(() => fetchBrackets())
 </script>

@@ -12,6 +12,7 @@ import com.buckle.inventory.mapper.PartMapper;
 import com.buckle.inventory.mapper.ScrapRecordMapper;
 import com.buckle.inventory.service.ActivityService;
 import com.buckle.inventory.service.DashboardService;
+import com.buckle.inventory.service.RedisCacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -38,8 +39,16 @@ public class DashboardServiceImpl implements DashboardService {
     @Autowired
     private ActivityService activityService;
 
+    @Autowired
+    private RedisCacheService redisCacheService;
+
     @Override
     public DashboardOverview getOverview() {
+        DashboardOverview cached = redisCacheService.getDashboardOverviewFromCache();
+        if (cached != null) {
+            return cached;
+        }
+
         com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Part> partWrapper =
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
         partWrapper.ne(Part::getDeleted, 1);
@@ -63,7 +72,9 @@ public class DashboardServiceImpl implements DashboardService {
         List<OutboundRecord> outboundRecords = outboundRecordMapper.selectList(outboundWrapper);
         int monthlyOutbound = outboundRecords.stream().mapToInt(OutboundRecord::getQuantity).sum();
 
-        return new DashboardOverview(totalParts, totalStock, monthlyInbound, monthlyOutbound);
+        DashboardOverview overview = new DashboardOverview(totalParts, totalStock, monthlyInbound, monthlyOutbound);
+        redisCacheService.setDashboardOverviewCache(overview);
+        return overview;
     }
 
     @Override

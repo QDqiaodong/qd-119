@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ClipboardCheck, ChevronDown, ChevronRight, Loader2, TrendingUp, TrendingDown, Check } from 'lucide-vue-next'
 import { inventoryApi, partsApi, type InventoryRecord, type Part, type InventoryItem } from '@/api'
 import Toast from '@/components/Toast.vue'
+import useInventoryRefresh from '@/composables/useInventoryRefresh'
+
+const { inventoryVersion, refreshInventory } = useInventoryRefresh()
 
 const loading = ref(true)
 const submitLoading = ref(false)
@@ -119,7 +122,7 @@ const onSubmit = async () => {
     showToast('盘点提交成功')
     quarter.value = ''
     operator.value = ''
-    await fetchRecords()
+    refreshInventory()
   } catch {
     showToast('盘点提交失败', 'error')
   } finally {
@@ -164,6 +167,11 @@ const changePage = (p: number) => {
   page.value = p
   fetchRecords()
 }
+
+watch(inventoryVersion, () => {
+  fetchRecords()
+  loadCheckItems()
+})
 
 onMounted(() => {
   fetchRecords()

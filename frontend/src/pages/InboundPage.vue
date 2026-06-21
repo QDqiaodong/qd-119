@@ -3,6 +3,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Plus, Search, Loader2 } from 'lucide-vue-next'
 import { inboundApi, partsApi, accessoryCategoryApi, shelfOccupancyApi, type InboundRecord, type Part, type AccessoryCategory, type ShelfOccupancyInfo } from '@/api'
 import Toast from '@/components/Toast.vue'
+import useInventoryRefresh from '@/composables/useInventoryRefresh'
+
+const { inventoryVersion, refreshInventory } = useInventoryRefresh()
 
 const loading = ref(true)
 const submitLoading = ref(false)
@@ -156,8 +159,7 @@ const onSubmit = async () => {
     })
     showToast('入库登记成功')
     resetForm()
-    await fetchRecords()
-    await fetchParts()
+    refreshInventory()
   } catch (e: any) {
     showToast('入库登记失败：' + (e?.message || '请重试'), 'error')
   } finally {
@@ -172,6 +174,11 @@ const changePage = (p: number) => {
   page.value = p
   fetchRecords()
 }
+
+watch(inventoryVersion, () => {
+  fetchRecords()
+  fetchParts()
+})
 
 onMounted(() => {
   fetchCategories()

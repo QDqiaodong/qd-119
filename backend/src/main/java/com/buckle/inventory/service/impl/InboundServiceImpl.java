@@ -105,6 +105,7 @@ public class InboundServiceImpl implements InboundService {
 
         Part part;
         int inboundQuantity = request.getQuantity();
+        LocalDateTime now = LocalDateTime.now();
 
         if (request.getPartId() != null) {
             part = partMapper.selectById(request.getPartId());
@@ -123,29 +124,18 @@ public class InboundServiceImpl implements InboundService {
             boolean isNewTypeForShelf = shelfChanged;
             shelfOccupancyService.checkCapacity(targetShelf, inboundQuantity, isNewTypeForShelf);
 
-            int oldTotal = part.getTotalQuantity() != null ? part.getTotalQuantity() : 0;
-            int oldStock = part.getCurrentStock() != null ? part.getCurrentStock() : 0;
-
-            int newTotal = oldTotal + inboundQuantity;
-            int newStock = oldStock + inboundQuantity;
-
-            part.setTotalQuantity(newTotal);
-            part.setCurrentStock(newStock);
-            if (StringUtils.hasText(request.getShelfPosition())) {
-                part.setShelfPosition(request.getShelfPosition());
-            }
-            part.setUpdatedAt(LocalDateTime.now());
-            int updateRows = partMapper.updateById(part);
-            if (updateRows == 0) {
+            int affected = partMapper.addStock(request.getPartId(), inboundQuantity, now);
+            if (affected == 0) {
                 throw new RuntimeException("更新配件库存失败，请重试");
             }
 
-            Part updatedPart = partMapper.selectById(part.getId());
-            if (updatedPart.getTotalQuantity() != newTotal || updatedPart.getCurrentStock() != newStock) {
-                throw new RuntimeException("库存更新后一致性校验失败");
+            if (shelfChanged) {
+                part.setShelfPosition(targetShelf);
+                part.setUpdatedAt(now);
+                partMapper.updateById(part);
             }
 
-            verifyPartConsistency(part.getId(), newTotal, newStock);
+            part = partMapper.selectById(request.getPartId());
         } else if (StringUtils.hasText(request.getPartName()) && StringUtils.hasText(request.getPartModel())) {
             if (request.getCategoryId() == null) {
                 throw new RuntimeException("请选择配件类别");
@@ -165,8 +155,8 @@ public class InboundServiceImpl implements InboundService {
             part.setTotalQuantity(inboundQuantity);
             part.setCurrentStock(inboundQuantity);
             part.setShelfPosition(targetShelf);
-            part.setCreatedAt(LocalDateTime.now());
-            part.setUpdatedAt(LocalDateTime.now());
+            part.setCreatedAt(now);
+            part.setUpdatedAt(now);
             part.setDeleted(0);
             partMapper.insert(part);
 
@@ -182,7 +172,7 @@ public class InboundServiceImpl implements InboundService {
         record.setQuantity(inboundQuantity);
         record.setShelfPosition(request.getShelfPosition());
         record.setOperator(request.getOperator() != null ? request.getOperator().trim() : "system");
-        record.setCreatedAt(LocalDateTime.now());
+        record.setCreatedAt(now);
         record.setPartName(part.getName());
         record.setPartModel(part.getModel());
         inboundRecordMapper.insert(record);
@@ -190,6 +180,8 @@ public class InboundServiceImpl implements InboundService {
         if (record.getId() == null) {
             throw new RuntimeException("记录入库流水失败");
         }
+
+        verifyPartConsistency(part.getId());
 
         redisCacheService.evictPartRelatedCache(part.getId(), null, null,
                 part.getShelfPosition(), part.getCategoryId());
@@ -211,7 +203,12 @@ public class InboundServiceImpl implements InboundService {
         }
     }
 
-    private void verifyPartConsistency(Long partId, int expectedTotal, int expectedCurrentStock) {
+    private void verifyPartConsistency(Long partId) {
+        Part part = partMapper.selectById(partId);
+        if (part == null) {
+            return;
+        }
+
         Integer totalInbound = inboundRecordMapper.selectList(
                         new LambdaQueryWrapper<InboundRecord>().eq(InboundRecord::getPartId, partId))
                 .stream()
@@ -232,6 +229,9 @@ public class InboundServiceImpl implements InboundService {
 
         int calculatedTotal = totalInbound;
         int calculatedStock = totalInbound - totalOutbound - totalScrap;
+
+        Integer expectedTotal = part.getTotalQuantity() != null ? part.getTotalQuantity() : 0;
+        Integer expectedCurrentStock = part.getCurrentStock() != null ? part.getCurrentStock() : 0;
 
         if (calculatedTotal != expectedTotal) {
             throw new RuntimeException(

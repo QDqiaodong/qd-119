@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { Trash2, Loader2 } from 'lucide-vue-next'
 import { scrapApi, partsApi, scrapReasonDictApi, type ScrapRecord, type Part, type ScrapReasonDict } from '@/api'
 import Toast from '@/components/Toast.vue'
+import useInventoryRefresh from '@/composables/useInventoryRefresh'
+
+const { inventoryVersion, refreshInventory } = useInventoryRefresh()
 
 const loading = ref(true)
 const submitLoading = ref(false)
@@ -126,8 +129,7 @@ const onSubmit = async () => {
     })
     showToast('报废登记成功')
     resetForm()
-    await fetchRecords()
-    await fetchParts()
+    refreshInventory()
   } catch (e: any) {
     showToast('报废登记失败：' + (e?.message || '请重试'), 'error')
   } finally {
@@ -170,6 +172,11 @@ const changePage = (p: number) => {
   page.value = p
   fetchRecords()
 }
+
+watch(inventoryVersion, () => {
+  fetchRecords()
+  fetchParts()
+})
 
 onMounted(() => {
   fetchRecords()
