@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Trash2, Loader2, X } from 'lucide-vue-next'
-import { scrapApi, partsApi, type ScrapRecord, type Part } from '@/api'
+import { ref, onMounted, computed } from 'vue'
+import { Trash2, Loader2 } from 'lucide-vue-next'
+import { scrapApi, partsApi, scrapReasonDictApi, type ScrapRecord, type Part, type ScrapReasonDict } from '@/api'
 import Toast from '@/components/Toast.vue'
 
 const loading = ref(true)
 const submitLoading = ref(false)
 const records = ref<ScrapRecord[]>([])
 const parts = ref<Part[]>([])
+const scrapReasons = ref<ScrapReasonDict[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 10
@@ -24,25 +25,33 @@ const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') 
 
 const selectedPartId = ref<number | null>(null)
 const quantity = ref(1)
-const selectedReasons = ref<string[]>([])
+const selectedReasonNames = ref<string[]>([])
 const remark = ref('')
 const operator = ref('')
 
-const reasonOptions = ['变形', '锈蚀', '断裂', '其他']
+const reasonNameMap = computed(() => {
+  const map: Record<string, ScrapReasonDict> = {}
+  scrapReasons.value.forEach(r => {
+    map[r.name] = r
+  })
+  return map
+})
+
+const reasonOptions = computed(() => scrapReasons.value.map(r => r.name))
 
 const toggleReason = (reason: string) => {
-  const idx = selectedReasons.value.indexOf(reason)
+  const idx = selectedReasonNames.value.indexOf(reason)
   if (idx >= 0) {
-    selectedReasons.value.splice(idx, 1)
+    selectedReasonNames.value.splice(idx, 1)
   } else {
-    selectedReasons.value.push(reason)
+    selectedReasonNames.value.push(reason)
   }
 }
 
 const resetForm = () => {
   selectedPartId.value = null
   quantity.value = 1
-  selectedReasons.value = []
+  selectedReasonNames.value = []
   remark.value = ''
   operator.value = ''
 }
@@ -69,6 +78,15 @@ const fetchParts = async () => {
   }
 }
 
+const fetchScrapReasons = async () => {
+  try {
+    const res = await scrapReasonDictApi.listEnabled()
+    scrapReasons.value = res ?? []
+  } catch {
+    scrapReasons.value = []
+  }
+}
+
 const onSubmit = async () => {
   if (!selectedPartId.value) {
     showToast('请选择配件', 'error')
@@ -78,7 +96,7 @@ const onSubmit = async () => {
     showToast('请填写报废数量', 'error')
     return
   }
-  if (selectedReasons.value.length === 0) {
+  if (selectedReasonNames.value.length === 0) {
     showToast('请选择报废原因', 'error')
     return
   }
@@ -92,7 +110,7 @@ const onSubmit = async () => {
     await scrapApi.create({
       part_id: selectedPartId.value,
       quantity: quantity.value,
-      reasons: selectedReasons.value,
+      reasons: selectedReasonNames.value,
       remark: remark.value,
       operator: operator.value,
     })
@@ -107,11 +125,32 @@ const onSubmit = async () => {
   }
 }
 
-const reasonTagColor: Record<string, string> = {
-  '变形': 'bg-red-100 text-red-700',
-  '锈蚀': 'bg-orange-100 text-orange-700',
-  '断裂': 'bg-purple-100 text-purple-700',
-  '其他': 'bg-gray-100 text-gray-700',
+const getReasonTagColor = (reasonName: string): string => {
+  const reason = reasonNameMap.value[reasonName]
+  if (!reason) return 'bg-gray-100 text-gray-700'
+  switch (reason.level) {
+    case '一级':
+      return 'bg-green-100 text-green-700'
+    case '二级':
+      return 'bg-orange-100 text-orange-700'
+    case '三级':
+      return 'bg-red-100 text-red-700'
+    default:
+      return 'bg-gray-100 text-gray-700'
+  }
+}
+
+const getLevelBadgeColor = (level: string): string => {
+  switch (level) {
+    case '一级':
+      return 'bg-green-500 text-white'
+    case '二级':
+      return 'bg-orange-500 text-white'
+    case '三级':
+      return 'bg-red-500 text-white'
+    default:
+      return 'bg-gray-500 text-white'
+  }
 }
 
 const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize))
@@ -125,6 +164,7 @@ const changePage = (p: number) => {
 onMounted(() => {
   fetchRecords()
   fetchParts()
+  fetchScrapReasons()
 })
 </script>
 
@@ -159,14 +199,18 @@ onMounted(() => {
       <div class="mt-4">
         <label class="block text-sm font-medium text-gray-600 mb-2">报废原因</label>
         <div class="flex flex-wrap gap-2">
-          <button v-for="reason in reasonOptions" :key="reason" @click="toggleReason(reason)"
+          <button v-for="reason in scrapReasons" :key="reason.id" @click="toggleReason(reason.name)"
+            :title="reason.description"
             :class="[
-              'px-4 py-1.5 rounded-full text-sm font-medium transition-colors border',
-              selectedReasons.includes(reason)
+              'px-4 py-1.5 rounded-full text-sm font-medium transition-colors border flex items-center gap-1.5',
+              selectedReasonNames.includes(reason.name)
                 ? 'bg-danger text-white border-danger'
                 : 'bg-white text-gray-600 border-gray-300 hover:border-danger hover:text-danger',
             ]">
-            {{ reason }}
+            <span :class="[getLevelBadgeColor(reason.level), 'px-1.5 py-0.5 rounded text-xs']">
+              {{ reason.level }}
+            </span>
+            {{ reason.name }}
           </button>
         </div>
       </div>
@@ -222,7 +266,7 @@ onMounted(() => {
                 <td class="py-3 px-4">
                   <div class="flex flex-wrap gap-1">
                     <span v-for="reason in (r.reason ? r.reason.split(',') : [])" :key="reason"
-                      :class="[reasonTagColor[reason] ?? 'bg-gray-100 text-gray-700', 'px-2 py-0.5 rounded text-xs font-medium']">
+                      :class="[getReasonTagColor(reason), 'px-2 py-0.5 rounded text-xs font-medium']">
                       {{ reason }}
                     </span>
                   </div>

@@ -4,15 +4,20 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.buckle.inventory.dto.PageResult;
 import com.buckle.inventory.dto.ScrapRequest;
 import com.buckle.inventory.entity.Part;
+import com.buckle.inventory.entity.ScrapReasonDict;
 import com.buckle.inventory.entity.ScrapRecord;
 import com.buckle.inventory.mapper.PartMapper;
 import com.buckle.inventory.mapper.ScrapRecordMapper;
+import com.buckle.inventory.service.ScrapReasonDictService;
 import com.buckle.inventory.service.ScrapService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class ScrapServiceImpl implements ScrapService {
@@ -22,6 +27,9 @@ public class ScrapServiceImpl implements ScrapService {
 
     @Autowired
     private PartMapper partMapper;
+
+    @Autowired
+    private ScrapReasonDictService scrapReasonDictService;
 
     @Override
     public PageResult<ScrapRecord> listScrap(int page, int size) {
@@ -99,6 +107,26 @@ public class ScrapServiceImpl implements ScrapService {
         }
         if (!org.springframework.util.StringUtils.hasText(request.getOperator())) {
             throw new RuntimeException("操作人不能为空");
+        }
+        if (!org.springframework.util.StringUtils.hasText(request.getReason())) {
+            throw new RuntimeException("报废原因不能为空");
+        }
+        validateScrapReasons(request.getReason());
+    }
+
+    private void validateScrapReasons(String reasons) {
+        String[] reasonArray = reasons.split(",");
+        if (reasonArray.length == 0) {
+            throw new RuntimeException("请选择至少一个报废原因");
+        }
+        List<ScrapReasonDict> validReasons = scrapReasonDictService.listEnabled();
+        Set<String> validReasonNames = validReasons.stream()
+                .map(ScrapReasonDict::getName)
+                .collect(Collectors.toSet());
+        for (String reason : reasonArray) {
+            if (!validReasonNames.contains(reason)) {
+                throw new RuntimeException("无效的报废原因: " + reason);
+            }
         }
     }
 }

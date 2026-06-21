@@ -75,6 +75,18 @@ export interface ScrapRecord {
   created_at: string
 }
 
+export interface ScrapReasonDict {
+  id: number
+  code: string
+  name: string
+  level: string
+  description?: string
+  sort_order: number
+  enabled: number
+  created_at: string
+  updated_at: string
+}
+
 export interface InventoryRecord {
   id: number
   quarter: string
@@ -178,6 +190,16 @@ export const scrapApi = {
       ...data,
       reason: data.reasons.join(','),
     }),
+}
+
+export const scrapReasonDictApi = {
+  listEnabled: () => http.get<any, ScrapReasonDict[]>('/api/scrap-reasons/enabled'),
+  listAll: () => http.get<any, ScrapReasonDict[]>('/api/scrap-reasons'),
+  getById: (id: number) => http.get<any, ScrapReasonDict>(`/api/scrap-reasons/${id}`),
+  getByCode: (code: string) => http.get<any, ScrapReasonDict>(`/api/scrap-reasons/code/${code}`),
+  create: (data: Partial<ScrapReasonDict>) => http.post<any, ScrapReasonDict>('/api/scrap-reasons', data),
+  update: (id: number, data: Partial<ScrapReasonDict>) => http.put<any, ScrapReasonDict>(`/api/scrap-reasons/${id}`, data),
+  remove: (id: number) => http.delete(`/api/scrap-reasons/${id}`),
 }
 
 export const dashboardApi = {
