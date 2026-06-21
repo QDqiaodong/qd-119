@@ -191,6 +191,7 @@ export const inventoryApi = {
   create: (data: { quarter: string; operator: string; items: { part_id: number; actual_quantity: number }[] }) =>
     http.post<any, InventoryRecord>('/api/inventory', data),
   getDetail: (id: number) => http.get<any, InventoryRecord>(`/api/inventory/${id}`),
+  listQuarters: () => http.get<any, string[]>('/api/inventory/quarters'),
 }
 
 export const scrapApi = {

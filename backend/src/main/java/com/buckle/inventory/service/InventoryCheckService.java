@@ -11,4 +11,8 @@ public interface InventoryCheckService {
     InventoryCheck addCheck(InventoryCheckRequest request);
 
     InventoryCheck getCheckDetail(Long id);
+
+    java.util.List<String> listAvailableQuarters();
+
+    String normalizeQuarter(String quarter);
 }

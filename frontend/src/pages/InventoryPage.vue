@@ -25,6 +25,7 @@ const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') 
 }
 
 const quarter = ref('')
+const quarters = ref<string[]>([])
 const operator = ref('')
 const allParts = ref<Part[]>([])
 const checkItems = ref<{ part_id: number; part_name: string; part_model: string; shelf_position: string; book_quantity: number; actual_quantity: number }[]>([])
@@ -47,21 +48,14 @@ const getSurplusItems = (items: InventoryItem[]) => items.filter((i) => i.differ
 const getDeficitItems = (items: InventoryItem[]) => items.filter((i) => i.difference < 0)
 const getMatchItems = (items: InventoryItem[]) => items.filter((i) => i.difference === 0)
 
-const generateQuarters = () => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const currentQuarter = Math.ceil((now.getMonth() + 1) / 3)
-  const result: string[] = []
-  for (let y = 2024; y <= year; y++) {
-    const maxQ = y === year ? currentQuarter : 4
-    for (let q = 1; q <= maxQ; q++) {
-      result.push(`${y}-Q${q}`)
-    }
+const fetchQuarters = async () => {
+  try {
+    const res = await inventoryApi.listQuarters()
+    quarters.value = res ?? []
+  } catch {
+    quarters.value = []
   }
-  return result.reverse()
 }
-
-const quarters = generateQuarters()
 
 const loadCheckItems = async () => {
   try {
@@ -171,11 +165,13 @@ const changePage = (p: number) => {
 watch(inventoryVersion, () => {
   fetchRecords()
   loadCheckItems()
+  fetchQuarters()
 })
 
 onMounted(() => {
   fetchRecords()
   loadCheckItems()
+  fetchQuarters()
 })
 </script>
 

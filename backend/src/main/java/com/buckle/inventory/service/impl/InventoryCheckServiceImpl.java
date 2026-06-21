@@ -15,9 +15,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class InventoryCheckServiceImpl implements InventoryCheckService {
@@ -43,7 +47,7 @@ public class InventoryCheckServiceImpl implements InventoryCheckService {
     @Transactional
     public InventoryCheck addCheck(InventoryCheckRequest request) {
         InventoryCheck check = new InventoryCheck();
-        check.setQuarter(request.getQuarter());
+        check.setQuarter(normalizeQuarter(request.getQuarter()));
         check.setOperator(request.getOperator());
         check.setCreatedAt(LocalDateTime.now());
 
@@ -128,5 +132,41 @@ public class InventoryCheckServiceImpl implements InventoryCheckService {
             check.setItems(items);
         }
         return check;
+    }
+
+    private static final Pattern QUARTER_PATTERN = Pattern.compile("^(\\d{4})[-\\s]?[Qq](\\d)$");
+    private static final int START_YEAR = 2024;
+
+    @Override
+    public List<String> listAvailableQuarters() {
+        List<String> result = new ArrayList<>();
+        LocalDate now = LocalDate.now();
+        int currentYear = now.getYear();
+        int currentQuarter = (now.getMonthValue() - 1) / 3 + 1;
+        for (int y = START_YEAR; y <= currentYear; y++) {
+            int maxQ = (y == currentYear) ? currentQuarter : 4;
+            for (int q = 1; q <= maxQ; q++) {
+                result.add(y + "-Q" + q);
+            }
+        }
+        Collections.reverse(result);
+        return result;
+    }
+
+    @Override
+    public String normalizeQuarter(String quarter) {
+        if (quarter == null || quarter.trim().isEmpty()) {
+            throw new IllegalArgumentException("盘点季度不能为空");
+        }
+        Matcher matcher = QUARTER_PATTERN.matcher(quarter.trim());
+        if (!matcher.matches()) {
+            throw new IllegalArgumentException("季度格式不正确，应为 YYYY-QN（例如 2024-Q1）");
+        }
+        int year = Integer.parseInt(matcher.group(1));
+        int q = Integer.parseInt(matcher.group(2));
+        if (q < 1 || q > 4) {
+            throw new IllegalArgumentException("季度必须是 1-4 之间的数字");
+        }
+        return year + "-Q" + q;
     }
 }

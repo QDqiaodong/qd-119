@@ -32,4 +32,9 @@ public class InventoryCheckController {
     public Result<InventoryCheck> getCheckDetail(@PathVariable Long id) {
         return Result.ok(inventoryCheckService.getCheckDetail(id));
     }
+
+    @GetMapping("/quarters")
+    public Result<java.util.List<String>> listAvailableQuarters() {
+        return Result.ok(inventoryCheckService.listAvailableQuarters());
+    }
 }
