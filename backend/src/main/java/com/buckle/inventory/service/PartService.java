@@ -1,6 +1,7 @@
 package com.buckle.inventory.service;
 
 import com.buckle.inventory.dto.PageResult;
+import com.buckle.inventory.dto.PartDeletionCheckDTO;
 import com.buckle.inventory.dto.PartQueryDTO;
 import com.buckle.inventory.entity.Part;
 
@@ -17,6 +18,8 @@ public interface PartService {
     Part updatePart(Part part);
 
     void deletePart(Long id);
+
+    PartDeletionCheckDTO checkDeletionAllowed(Long id);
 
     List<Part> batchAddParts(List<Part> parts);
 

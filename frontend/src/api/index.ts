@@ -142,12 +142,22 @@ export interface PageResult<T> {
   page_size: number
 }
 
+export interface PartDeletionCheck {
+  can_delete: boolean
+  inbound_count: number
+  outbound_count: number
+  scrap_count: number
+  inventory_check_count: number
+  total_related_count: number
+}
+
 export const partsApi = {
   list: (params?: Record<string, unknown>) => http.get<any, PageResult<Part>>('/api/parts', { params }),
   getById: (id: number) => http.get<any, Part>(`/api/parts/${id}`),
   create: (data: Partial<Part>) => http.post<any, Part>('/api/parts', data),
   update: (id: number, data: Partial<Part>) => http.put<any, Part>(`/api/parts/${id}`, data),
   remove: (id: number) => http.delete(`/api/parts/${id}`),
+  checkDeletion: (id: number) => http.get<any, PartDeletionCheck>(`/api/parts/${id}/deletion-check`),
   batchCreate: (data: Partial<Part>[]) => http.post<any, Part[]>('/api/parts/batch', data),
 }
 

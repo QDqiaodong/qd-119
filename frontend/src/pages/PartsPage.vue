@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { Plus, Search, Edit, Trash2, Loader2, PackagePlus, X } from 'lucide-vue-next'
-import { partsApi, inboundApi, accessoryCategoryApi, shelfOccupancyApi, type Part, type AccessoryCategory, type ShelfOccupancyInfo } from '@/api'
+import { partsApi, inboundApi, accessoryCategoryApi, shelfOccupancyApi, type Part, type AccessoryCategory, type ShelfOccupancyInfo, type PartDeletionCheck } from '@/api'
 import Toast from '@/components/Toast.vue'
 
 const loading = ref(true)
@@ -177,15 +177,41 @@ const onModalSubmit = async () => {
   }
 }
 
-const onDelete = async (id: number) => {
+const showDeleteConfirm = ref(false)
+const deletingPartId = ref<number | null>(null)
+const deletionCheck = ref<PartDeletionCheck | null>(null)
+const checkingDeletion = ref(false)
+
+const openDeleteConfirm = async (id: number) => {
   try {
-    deleteLoading.value = id
-    await partsApi.remove(id)
+    checkingDeletion.value = true
+    deletingPartId.value = id
+    deletionCheck.value = await partsApi.checkDeletion(id)
+    showDeleteConfirm.value = true
+  } catch (e: any) {
+    showToast('检查删除条件失败：' + (e?.message || '请重试'), 'error')
+  } finally {
+    checkingDeletion.value = false
+  }
+}
+
+const closeDeleteConfirm = () => {
+  showDeleteConfirm.value = false
+  deletingPartId.value = null
+  deletionCheck.value = null
+}
+
+const onDelete = async () => {
+  if (!deletingPartId.value) return
+  try {
+    deleteLoading.value = deletingPartId.value
+    await partsApi.remove(deletingPartId.value)
     showToast('删除成功')
-    selectedIds.value = selectedIds.value.filter((i) => i !== id)
+    selectedIds.value = selectedIds.value.filter((i) => i !== deletingPartId.value)
+    closeDeleteConfirm()
     await fetchParts()
-  } catch {
-    showToast('删除失败', 'error')
+  } catch (e: any) {
+    showToast('删除失败：' + (e?.message || '请重试'), 'error')
   } finally {
     deleteLoading.value = null
   }
@@ -401,7 +427,7 @@ onMounted(() => {
                       class="text-primary-600 hover:text-primary-800 transition-colors" title="编辑">
                       <Edit :size="16" />
                     </button>
-                    <button @click="onDelete(p.id)" :disabled="deleteLoading === p.id"
+                    <button @click="openDeleteConfirm(p.id)" :disabled="deleteLoading === p.id"
                       class="text-danger hover:text-red-700 transition-colors disabled:opacity-50" title="删除">
                       <Loader2 v-if="deleteLoading === p.id" :size="16" class="animate-spin" />
                       <Trash2 v-else :size="16" />
@@ -554,6 +580,82 @@ onMounted(() => {
               <Loader2 v-if="batchSubmitting" :size="16" class="mr-2 animate-spin" />
               <PackagePlus v-else :size="16" class="mr-2" />
               确认入库
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showDeleteConfirm" class="fixed inset-0 z-40 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" @click="closeDeleteConfirm"></div>
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6 z-50">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold text-primary-800">
+              删除确认
+            </h3>
+            <button @click="closeDeleteConfirm" class="text-gray-400 hover:text-gray-600 transition-colors">
+              <X :size="20" />
+            </button>
+          </div>
+
+          <div v-if="checkingDeletion" class="flex justify-center py-8">
+            <div class="w-6 h-6 border-4 border-primary-300 border-t-primary-800 rounded-full animate-spin"></div>
+          </div>
+
+          <template v-else-if="deletionCheck">
+            <div v-if="deletionCheck.can_delete" class="text-center">
+              <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-100 flex items-center justify-center">
+                <Trash2 :size="28" class="text-yellow-600" />
+              </div>
+              <p class="text-gray-700 mb-2">确认要删除该配件吗？</p>
+              <p class="text-sm text-gray-500">删除后无法恢复，请谨慎操作。</p>
+            </div>
+
+            <div v-else class="space-y-3">
+              <div class="flex items-start">
+                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mr-3 flex-shrink-0">
+                  <Trash2 :size="20" class="text-danger" />
+                </div>
+                <div>
+                  <p class="text-gray-800 font-medium">该配件存在关联记录，无法删除</p>
+                  <p class="text-sm text-gray-500 mt-1">请先处理以下关联记录后再删除：</p>
+                </div>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div v-if="deletionCheck.inbound_count > 0" class="flex justify-between text-sm">
+                  <span class="text-gray-600">入库记录</span>
+                  <span class="font-medium text-gray-800">{{ deletionCheck.inbound_count }} 条</span>
+                </div>
+                <div v-if="deletionCheck.outbound_count > 0" class="flex justify-between text-sm">
+                  <span class="text-gray-600">出库记录</span>
+                  <span class="font-medium text-gray-800">{{ deletionCheck.outbound_count }} 条</span>
+                </div>
+                <div v-if="deletionCheck.scrap_count > 0" class="flex justify-between text-sm">
+                  <span class="text-gray-600">报废记录</span>
+                  <span class="font-medium text-gray-800">{{ deletionCheck.scrap_count }} 条</span>
+                </div>
+                <div v-if="deletionCheck.inventory_check_count > 0" class="flex justify-between text-sm">
+                  <span class="text-gray-600">盘点记录</span>
+                  <span class="font-medium text-gray-800">{{ deletionCheck.inventory_check_count }} 条</span>
+                </div>
+                <div class="flex justify-between text-sm border-t border-gray-200 pt-2 mt-2">
+                  <span class="text-gray-700 font-medium">合计关联记录</span>
+                  <span class="font-bold text-danger">{{ deletionCheck.total_related_count }} 条</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div class="flex justify-end gap-3 mt-6">
+            <button @click="closeDeleteConfirm"
+              class="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">
+              {{ deletionCheck && deletionCheck.can_delete ? '取消' : '知道了' }}
+            </button>
+            <button v-if="deletionCheck && deletionCheck.can_delete" @click="onDelete" :disabled="deleteLoading !== null"
+              class="bg-danger hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center">
+              <Loader2 v-if="deleteLoading !== null" :size="16" class="mr-2 animate-spin" />
+              确认删除
             </button>
           </div>
         </div>

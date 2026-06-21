@@ -13,14 +13,22 @@ import com.buckle.inventory.service.ScrapService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class ScrapServiceImpl implements ScrapService {
+
+    private static final String OTHER_REASON_CODE = "OTHER";
 
     @Autowired
     private ScrapRecordMapper scrapRecordMapper;
@@ -81,10 +89,12 @@ public class ScrapServiceImpl implements ScrapService {
         part.setUpdatedAt(LocalDateTime.now());
         partMapper.updateById(part);
 
+        String processedReasons = processScrapReasons(request.getReason());
+
         ScrapRecord record = new ScrapRecord();
         record.setPartId(request.getPartId());
         record.setQuantity(request.getQuantity());
-        record.setReason(request.getReason());
+        record.setReason(processedReasons);
         record.setRemark(request.getRemark());
         record.setOperator(request.getOperator());
         record.setCreatedAt(LocalDateTime.now());
@@ -93,6 +103,25 @@ public class ScrapServiceImpl implements ScrapService {
         scrapRecordMapper.insert(record);
 
         return record;
+    }
+
+    private String processScrapReasons(String reasons) {
+        if (!StringUtils.hasText(reasons)) {
+            return reasons;
+        }
+        List<ScrapReasonDict> allReasons = scrapReasonDictService.listAll();
+        Map<String, ScrapReasonDict> reasonMap = allReasons.stream()
+                .collect(Collectors.toMap(ScrapReasonDict::getName, r -> r));
+
+        List<String> reasonList = Arrays.asList(reasons.split(","));
+        Set<String> uniqueReasons = new LinkedHashSet<>(reasonList);
+        List<String> sortedReasons = new ArrayList<>(uniqueReasons);
+        sortedReasons.sort(Comparator.comparingInt(r -> {
+            ScrapReasonDict dict = reasonMap.get(r);
+            return dict != null && dict.getSortOrder() != null ? dict.getSortOrder() : Integer.MAX_VALUE;
+        }));
+
+        return String.join(",", sortedReasons);
     }
 
     private void validateRequest(ScrapRequest request) {
@@ -105,16 +134,16 @@ public class ScrapServiceImpl implements ScrapService {
         if (request.getQuantity() <= 0) {
             throw new RuntimeException("报废数量必须大于0，当前值: " + request.getQuantity());
         }
-        if (!org.springframework.util.StringUtils.hasText(request.getOperator())) {
+        if (!StringUtils.hasText(request.getOperator())) {
             throw new RuntimeException("操作人不能为空");
         }
-        if (!org.springframework.util.StringUtils.hasText(request.getReason())) {
+        if (!StringUtils.hasText(request.getReason())) {
             throw new RuntimeException("报废原因不能为空");
         }
-        validateScrapReasons(request.getReason());
+        validateScrapReasons(request.getReason(), request.getRemark());
     }
 
-    private void validateScrapReasons(String reasons) {
+    private void validateScrapReasons(String reasons, String remark) {
         String[] reasonArray = reasons.split(",");
         if (reasonArray.length == 0) {
             throw new RuntimeException("请选择至少一个报废原因");
@@ -123,10 +152,25 @@ public class ScrapServiceImpl implements ScrapService {
         Set<String> validReasonNames = validReasons.stream()
                 .map(ScrapReasonDict::getName)
                 .collect(Collectors.toSet());
+
+        ScrapReasonDict otherReasonDict = validReasons.stream()
+                .filter(r -> OTHER_REASON_CODE.equals(r.getCode()))
+                .findFirst()
+                .orElse(null);
+        String otherReasonName = otherReasonDict != null ? otherReasonDict.getName() : null;
+
+        boolean containsOther = false;
         for (String reason : reasonArray) {
             if (!validReasonNames.contains(reason)) {
                 throw new RuntimeException("无效的报废原因: " + reason);
             }
+            if (otherReasonName != null && otherReasonName.equals(reason)) {
+                containsOther = true;
+            }
+        }
+
+        if (containsOther && !StringUtils.hasText(remark)) {
+            throw new RuntimeException("选择「其他」报废原因时，备注不能为空");
         }
     }
 }

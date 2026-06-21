@@ -39,6 +39,12 @@ const reasonNameMap = computed(() => {
 
 const reasonOptions = computed(() => scrapReasons.value.map(r => r.name))
 
+const hasOtherReason = computed(() => {
+  const otherDict = scrapReasons.value.find(r => r.code === 'OTHER')
+  if (!otherDict) return false
+  return selectedReasonNames.value.includes(otherDict.name)
+})
+
 const toggleReason = (reason: string) => {
   const idx = selectedReasonNames.value.indexOf(reason)
   if (idx >= 0) {
@@ -100,6 +106,10 @@ const onSubmit = async () => {
     showToast('请选择报废原因', 'error')
     return
   }
+  if (hasOtherReason.value && !remark.value.trim()) {
+    showToast('选择「其他」报废原因时，备注不能为空', 'error')
+    return
+  }
   if (!operator.value) {
     showToast('请填写操作人', 'error')
     return
@@ -118,8 +128,8 @@ const onSubmit = async () => {
     resetForm()
     await fetchRecords()
     await fetchParts()
-  } catch {
-    showToast('报废登记失败', 'error')
+  } catch (e: any) {
+    showToast('报废登记失败：' + (e?.message || '请重试'), 'error')
   } finally {
     submitLoading.value = false
   }
@@ -216,9 +226,15 @@ onMounted(() => {
       </div>
 
       <div class="mt-4">
-        <label class="block text-sm font-medium text-gray-600 mb-1">备注</label>
+        <label class="block text-sm font-medium text-gray-600 mb-1">
+          备注
+          <span v-if="hasOtherReason" class="text-danger ml-1">* 选择「其他」原因时必填</span>
+        </label>
         <textarea v-model="remark" rows="2" placeholder="请输入备注信息"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"></textarea>
+          :class="[
+            'w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none',
+            hasOtherReason && !remark.trim() ? 'border-danger' : 'border-gray-300',
+          ]"></textarea>
       </div>
 
       <div class="mt-4">

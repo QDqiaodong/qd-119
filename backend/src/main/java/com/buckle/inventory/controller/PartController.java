@@ -1,6 +1,7 @@
 package com.buckle.inventory.controller;
 
 import com.buckle.inventory.dto.PageResult;
+import com.buckle.inventory.dto.PartDeletionCheckDTO;
 import com.buckle.inventory.dto.PartQueryDTO;
 import com.buckle.inventory.dto.Result;
 import com.buckle.inventory.entity.Part;
@@ -38,6 +39,11 @@ public class PartController {
     public Result<Void> deletePart(@PathVariable Long id) {
         partService.deletePart(id);
         return Result.ok(null);
+    }
+
+    @GetMapping("/{id}/deletion-check")
+    public Result<PartDeletionCheckDTO> checkDeletionAllowed(@PathVariable Long id) {
+        return Result.ok(partService.checkDeletionAllowed(id));
     }
 
     @GetMapping("/{id}")

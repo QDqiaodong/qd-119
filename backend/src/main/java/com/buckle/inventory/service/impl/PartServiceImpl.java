@@ -3,11 +3,20 @@ package com.buckle.inventory.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.buckle.inventory.dto.PageResult;
+import com.buckle.inventory.dto.PartDeletionCheckDTO;
 import com.buckle.inventory.dto.PartQueryDTO;
 import com.buckle.inventory.entity.AccessoryCategory;
+import com.buckle.inventory.entity.InboundRecord;
+import com.buckle.inventory.entity.InventoryCheckItem;
+import com.buckle.inventory.entity.OutboundRecord;
 import com.buckle.inventory.entity.Part;
+import com.buckle.inventory.entity.ScrapRecord;
 import com.buckle.inventory.mapper.AccessoryCategoryMapper;
+import com.buckle.inventory.mapper.InboundRecordMapper;
+import com.buckle.inventory.mapper.InventoryCheckItemMapper;
+import com.buckle.inventory.mapper.OutboundRecordMapper;
 import com.buckle.inventory.mapper.PartMapper;
+import com.buckle.inventory.mapper.ScrapRecordMapper;
 import com.buckle.inventory.service.PartService;
 import com.buckle.inventory.service.RedisCacheService;
 import com.buckle.inventory.service.ShelfOccupancyService;
@@ -34,6 +43,18 @@ public class PartServiceImpl implements PartService {
 
     @Autowired
     private ShelfOccupancyService shelfOccupancyService;
+
+    @Autowired
+    private InboundRecordMapper inboundRecordMapper;
+
+    @Autowired
+    private OutboundRecordMapper outboundRecordMapper;
+
+    @Autowired
+    private ScrapRecordMapper scrapRecordMapper;
+
+    @Autowired
+    private InventoryCheckItemMapper inventoryCheckItemMapper;
 
     @Override
     public PageResult<Part> listParts(PartQueryDTO query) {
@@ -141,6 +162,23 @@ public class PartServiceImpl implements PartService {
 
     @Override
     public void deletePart(Long id) {
+        PartDeletionCheckDTO checkDTO = checkDeletionAllowed(id);
+        if (!checkDTO.isCanDelete()) {
+            StringBuilder sb = new StringBuilder("该配件存在关联记录，无法删除：");
+            if (checkDTO.getInboundCount() > 0) {
+                sb.append("入库记录").append(checkDTO.getInboundCount()).append("条 ");
+            }
+            if (checkDTO.getOutboundCount() > 0) {
+                sb.append("出库记录").append(checkDTO.getOutboundCount()).append("条 ");
+            }
+            if (checkDTO.getScrapCount() > 0) {
+                sb.append("报废记录").append(checkDTO.getScrapCount()).append("条 ");
+            }
+            if (checkDTO.getInventoryCheckCount() > 0) {
+                sb.append("盘点记录").append(checkDTO.getInventoryCheckCount()).append("条");
+            }
+            throw new RuntimeException(sb.toString().trim());
+        }
         Part part = partMapper.selectById(id);
         if (part != null) {
             part.setDeleted(1);
@@ -148,6 +186,30 @@ public class PartServiceImpl implements PartService {
             partMapper.updateById(part);
         }
         redisCacheService.refreshPartsCache();
+    }
+
+    @Override
+    public PartDeletionCheckDTO checkDeletionAllowed(Long id) {
+        PartDeletionCheckDTO dto = new PartDeletionCheckDTO();
+
+        LambdaQueryWrapper<InboundRecord> inboundWrapper = new LambdaQueryWrapper<>();
+        inboundWrapper.eq(InboundRecord::getPartId, id);
+        dto.setInboundCount(Math.toIntExact(inboundRecordMapper.selectCount(inboundWrapper)));
+
+        LambdaQueryWrapper<OutboundRecord> outboundWrapper = new LambdaQueryWrapper<>();
+        outboundWrapper.eq(OutboundRecord::getPartId, id);
+        dto.setOutboundCount(Math.toIntExact(outboundRecordMapper.selectCount(outboundWrapper)));
+
+        LambdaQueryWrapper<ScrapRecord> scrapWrapper = new LambdaQueryWrapper<>();
+        scrapWrapper.eq(ScrapRecord::getPartId, id);
+        dto.setScrapCount(Math.toIntExact(scrapRecordMapper.selectCount(scrapWrapper)));
+
+        LambdaQueryWrapper<InventoryCheckItem> checkWrapper = new LambdaQueryWrapper<>();
+        checkWrapper.eq(InventoryCheckItem::getPartId, id);
+        dto.setInventoryCheckCount(Math.toIntExact(inventoryCheckItemMapper.selectCount(checkWrapper)));
+
+        dto.setCanDelete(dto.getTotalRelatedCount() == 0);
+        return dto;
     }
 
     @Override
