@@ -38,149 +38,6 @@ const stockLevelMeta: Record<StockLevel, { number: string; label: string; text: 
   normal: { number: 'text-gray-700', label: '', text: '', icon: CheckCircle, color: 'bg-success' },
 }
 
-const mockBrackets: BracketPart[] = [
-  {
-    id: 1,
-    category_id: 2,
-    name: '固定支架',
-    model: 'ZJ-100-20',
-    total_quantity: 100,
-    current_stock: 45,
-    shelf_position: 'C-01-01',
-    updated_at: '2026-06-15 14:30',
-    length: 100,
-    hole_spacing: 20,
-    compatible_machines: ['PM-100', 'PM-200'],
-    last_inbound_time: '2026-06-10 09:15:00',
-  },
-  {
-    id: 2,
-    category_id: 2,
-    name: '固定支架',
-    model: 'ZJ-100-25',
-    total_quantity: 80,
-    current_stock: 12,
-    shelf_position: 'C-01-02',
-    updated_at: '2026-06-14 10:20',
-    length: 100,
-    hole_spacing: 25,
-    compatible_machines: ['PM-200', 'PM-300'],
-    last_inbound_time: '2026-06-08 11:30:00',
-  },
-  {
-    id: 3,
-    category_id: 2,
-    name: '固定支架',
-    model: 'ZJ-150-20',
-    total_quantity: 60,
-    current_stock: 5,
-    shelf_position: 'C-01-03',
-    updated_at: '2026-06-16 16:45',
-    length: 150,
-    hole_spacing: 20,
-    compatible_machines: ['PM-300', 'PM-400'],
-    last_inbound_time: '2026-06-05 08:45:00',
-  },
-  {
-    id: 4,
-    category_id: 2,
-    name: '固定支架',
-    model: 'ZJ-150-30',
-    total_quantity: 50,
-    current_stock: 2,
-    shelf_position: 'C-02-01',
-    updated_at: '2026-06-17 09:00',
-    length: 150,
-    hole_spacing: 30,
-    compatible_machines: ['PM-400', 'PM-500'],
-    last_inbound_time: '2026-06-01 13:20:00',
-  },
-  {
-    id: 5,
-    category_id: 2,
-    name: '固定支架',
-    model: 'ZJ-200-25',
-    total_quantity: 70,
-    current_stock: 55,
-    shelf_position: 'C-02-02',
-    updated_at: '2026-06-18 11:10',
-    length: 200,
-    hole_spacing: 25,
-    compatible_machines: ['PM-100', 'PM-200', 'PM-300'],
-    last_inbound_time: '2026-06-12 15:00:00',
-  },
-  {
-    id: 6,
-    category_id: 2,
-    name: '固定支架',
-    model: 'ZJ-200-30',
-    total_quantity: 40,
-    current_stock: 28,
-    shelf_position: 'C-02-03',
-    updated_at: '2026-06-13 15:30',
-    length: 200,
-    hole_spacing: 30,
-    compatible_machines: ['PM-200', 'PM-400'],
-    last_inbound_time: '2026-06-09 10:10:00',
-  },
-  {
-    id: 7,
-    category_id: 2,
-    name: '固定支架',
-    model: 'ZJ-250-30',
-    total_quantity: 30,
-    current_stock: 18,
-    shelf_position: 'D-01-01',
-    updated_at: '2026-06-12 08:45',
-    length: 250,
-    hole_spacing: 30,
-    compatible_machines: ['PM-300', 'PM-500'],
-    last_inbound_time: '2026-06-07 14:25:00',
-  },
-  {
-    id: 8,
-    category_id: 2,
-    name: '固定支架',
-    model: 'ZJ-250-40',
-    total_quantity: 25,
-    current_stock: 7,
-    shelf_position: 'D-01-02',
-    updated_at: '2026-06-11 12:00',
-    length: 250,
-    hole_spacing: 40,
-    compatible_machines: ['PM-500'],
-    last_inbound_time: '2026-06-11 16:40:00',
-  },
-  {
-    id: 9,
-    category_id: 2,
-    name: '固定支架',
-    model: 'ZJ-300-30',
-    total_quantity: 20,
-    current_stock: 16,
-    shelf_position: 'D-02-01',
-    updated_at: '2026-06-10 09:30',
-    length: 300,
-    hole_spacing: 30,
-    compatible_machines: ['PM-400', 'PM-500'],
-    last_inbound_time: '2026-06-06 11:20:00',
-  },
-  {
-    id: 10,
-    category_id: 2,
-    name: '固定支架',
-    model: 'ZJ-300-40',
-    total_quantity: 15,
-    current_stock: 1,
-    shelf_position: 'D-02-02',
-    updated_at: '2026-06-09 14:15',
-    length: 300,
-    hole_spacing: 40,
-    compatible_machines: ['PM-500'],
-    last_inbound_time: '2026-05-28 09:00:00',
-  },
-]
-
 const availableLengths = computed(() => {
   const lengths = [...new Set(brackets.value.map((b) => b.length))].sort((a, b) => a - b)
   return lengths
@@ -193,7 +50,7 @@ const availableHoleSpacings = computed(() => {
 
 const availableMachines = computed(() => {
   const machines = new Set<string>()
-  brackets.value.forEach((b) => b.compatible_machines.forEach((m) => machines.add(m)))
+  brackets.value.forEach((b) => (b.compatible_machines || []).forEach((m) => machines.add(m)))
   return [...machines].sort()
 })
 
@@ -201,7 +58,7 @@ const filteredBrackets = computed(() => {
   return brackets.value.filter((b) => {
     const matchLength = selectedLength.value === null || b.length === selectedLength.value
     const matchHoleSpacing = selectedHoleSpacing.value === null || b.hole_spacing === selectedHoleSpacing.value
-    const matchMachine = selectedMachine.value === null || b.compatible_machines.includes(selectedMachine.value)
+    const matchMachine = selectedMachine.value === null || (b.compatible_machines || []).includes(selectedMachine.value)
     return matchLength && matchHoleSpacing && matchMachine
   })
 })
@@ -229,8 +86,9 @@ const fetchBrackets = async () => {
     loading.value = true
     const res = await bracketApi.list({ size: 100 })
     brackets.value = res.list ?? []
-  } catch {
-    brackets.value = mockBrackets
+  } catch (e: any) {
+    brackets.value = []
+    showToast('加载支架数据失败：' + (e?.message || '请稍后重试'), 'error')
   } finally {
     loading.value = false
   }
@@ -493,7 +351,7 @@ onMounted(() => fetchBrackets())
 
               <div class="pt-3 border-t border-gray-100">
                 <div class="text-xs text-gray-500 mb-1.5">适配机型：</div>
-                <div class="flex flex-wrap gap-1 mb-3">
+                <div v-if="bracket.compatible_machines && bracket.compatible_machines.length" class="flex flex-wrap gap-1 mb-3">
                   <span
                     v-for="machine in bracket.compatible_machines"
                     :key="machine"
@@ -502,6 +360,7 @@ onMounted(() => fetchBrackets())
                     {{ machine }}
                   </span>
                 </div>
+                <div v-else class="text-xs text-gray-400 mb-3">暂无领用记录</div>
 
                 <div v-if="getReplaceableBrackets(bracket).length > 0">
                   <div class="text-xs text-accent-600 mb-1.5 font-medium">

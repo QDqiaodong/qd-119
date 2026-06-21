@@ -53,7 +53,13 @@ public class InventoryCheckServiceImpl implements InventoryCheckService {
 
         for (InventoryCheckRequest.CheckItemRequest itemReq : request.getItems()) {
             Part part = partMapper.selectById(itemReq.getPartId());
-            int bookQuantity = (part != null) ? part.getCurrentStock() : 0;
+            if (part == null) {
+                throw new RuntimeException("盘点配件不存在，无法参与盘点: partId=" + itemReq.getPartId());
+            }
+            if (part.getDeleted() != null && part.getDeleted() == 1) {
+                throw new RuntimeException("盘点配件已删除，无法参与盘点: partId=" + itemReq.getPartId());
+            }
+            int bookQuantity = part.getCurrentStock() != null ? part.getCurrentStock() : 0;
             int difference = itemReq.getActualQuantity() - bookQuantity;
 
             if (difference == 0) {
@@ -67,11 +73,9 @@ public class InventoryCheckServiceImpl implements InventoryCheckService {
             item.setBookQuantity(bookQuantity);
             item.setActualQuantity(itemReq.getActualQuantity());
             item.setDifference(difference);
-            if (part != null) {
-                item.setPartName(part.getName());
-                item.setPartModel(part.getModel());
-                item.setShelfPosition(part.getShelfPosition());
-            }
+            item.setPartName(part.getName());
+            item.setPartModel(part.getModel());
+            item.setShelfPosition(part.getShelfPosition());
             items.add(item);
         }
 

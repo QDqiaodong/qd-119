@@ -68,105 +68,6 @@ const stockLabelText = (b: BucklePart) => stockLevelMeta[stockLevel(b)].text
 const cardBorderClass = (b: BucklePart) => stockLevelMeta[stockLevel(b)].border
 const cardBgClass = (b: BucklePart) => stockLevelMeta[stockLevel(b)].bg
 
-const mockBuckles: BucklePart[] = [
-  {
-    id: 1,
-    category_id: 1,
-    name: '包装机卡扣',
-    model: 'KK-001-S',
-    total_quantity: 500,
-    current_stock: 25,
-    shelf_position: 'A-01-01',
-    updated_at: '2026-06-15 14:30',
-    compatible_machines: ['PM-100', 'PM-200'],
-    last_inbound_time: '2026-06-10 09:15:00',
-  },
-  {
-    id: 2,
-    category_id: 1,
-    name: '包装机卡扣',
-    model: 'KK-002-M',
-    total_quantity: 500,
-    current_stock: 85,
-    shelf_position: 'A-01-02',
-    updated_at: '2026-06-14 10:20',
-    compatible_machines: ['PM-200', 'PM-300'],
-    last_inbound_time: '2026-06-08 11:30:00',
-  },
-  {
-    id: 3,
-    category_id: 1,
-    name: '包装机卡扣',
-    model: 'KK-003-L',
-    total_quantity: 500,
-    current_stock: 15,
-    shelf_position: 'A-01-03',
-    updated_at: '2026-06-16 16:45',
-    compatible_machines: ['PM-300', 'PM-400'],
-    last_inbound_time: '2026-06-05 08:45:00',
-  },
-  {
-    id: 4,
-    category_id: 1,
-    name: '包装机卡扣',
-    model: 'KK-004-XL',
-    total_quantity: 300,
-    current_stock: 3,
-    shelf_position: 'A-02-01',
-    updated_at: '2026-06-17 09:00',
-    compatible_machines: ['PM-400', 'PM-500'],
-    last_inbound_time: '2026-06-01 13:20:00',
-  },
-  {
-    id: 5,
-    category_id: 1,
-    name: '包装机卡扣',
-    model: 'KK-005-S',
-    total_quantity: 600,
-    current_stock: 350,
-    shelf_position: 'A-02-02',
-    updated_at: '2026-06-18 11:10',
-    compatible_machines: ['PM-100', 'PM-200', 'PM-300'],
-    last_inbound_time: '2026-06-12 15:00:00',
-  },
-  {
-    id: 6,
-    category_id: 1,
-    name: '包装机卡扣',
-    model: 'KK-006-M',
-    total_quantity: 400,
-    current_stock: 130,
-    shelf_position: 'A-02-03',
-    updated_at: '2026-06-13 15:30',
-    compatible_machines: ['PM-200', 'PM-400'],
-    last_inbound_time: '2026-06-09 10:10:00',
-  },
-  {
-    id: 7,
-    category_id: 1,
-    name: '包装机卡扣',
-    model: 'KK-007-L',
-    total_quantity: 500,
-    current_stock: 60,
-    shelf_position: 'B-01-01',
-    updated_at: '2026-06-12 08:45',
-    compatible_machines: ['PM-300', 'PM-500'],
-    last_inbound_time: '2026-06-07 14:25:00',
-  },
-  {
-    id: 8,
-    category_id: 1,
-    name: '包装机卡扣',
-    model: 'KK-008-XL',
-    total_quantity: 350,
-    current_stock: 210,
-    shelf_position: 'B-01-02',
-    updated_at: '2026-06-11 12:00',
-    compatible_machines: ['PM-500'],
-    last_inbound_time: '2026-06-11 16:40:00',
-  },
-]
-
 const filteredBuckles = computed(() => {
   return buckles.value.filter((b) => {
     const matchModel = b.model.toLowerCase().includes(searchModel.value.toLowerCase())
@@ -181,8 +82,9 @@ const fetchBuckles = async () => {
     loading.value = true
     const res = await buckleApi.list({ size: 100 })
     buckles.value = res.list ?? []
-  } catch {
-    buckles.value = mockBuckles
+  } catch (e: any) {
+    buckles.value = []
+    showToast('加载卡扣数据失败：' + (e?.message || '请稍后重试'), 'error')
   } finally {
     loading.value = false
   }
@@ -203,6 +105,11 @@ const formatDate = (dateStr?: string) => {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+const getStockPercentage = (b: BucklePart) => {
+  if (b.total_quantity <= 0) return 0
+  return Math.min(100, Math.round((b.current_stock / b.total_quantity) * 100))
 }
 
 onMounted(() => fetchBuckles())
@@ -348,7 +255,7 @@ onMounted(() => fetchBuckles())
                   'bg-yellow-500': stockLevel(buckle) === 'mild',
                   'bg-success': stockLevel(buckle) === 'normal',
                 }"
-                :style="{ width: `${Math.min(100, (buckle.current_stock / buckle.total_quantity) * 100)}%` }"
+                :style="{ width: `${getStockPercentage(buckle)}%` }"
               ></div>
             </div>
 
@@ -361,7 +268,7 @@ onMounted(() => fetchBuckles())
 
           <div class="mt-3 pt-3 border-t border-gray-100">
             <div class="text-xs text-gray-500 mb-1.5">适配机型：</div>
-            <div class="flex flex-wrap gap-1">
+            <div v-if="buckle.compatible_machines && buckle.compatible_machines.length" class="flex flex-wrap gap-1">
               <span
                 v-for="machine in buckle.compatible_machines"
                 :key="machine"
@@ -370,6 +277,7 @@ onMounted(() => fetchBuckles())
                 {{ machine }}
               </span>
             </div>
+            <span v-else class="text-xs text-gray-400">暂无领用记录</span>
           </div>
         </div>
       </div>
