@@ -17,7 +17,7 @@ public interface PartService {
 
     Part updatePart(Part part);
 
-    void deletePart(Long id);
+    PartDeletionCheckDTO deletePart(Long id);
 
     PartDeletionCheckDTO checkDeletionAllowed(Long id);
 

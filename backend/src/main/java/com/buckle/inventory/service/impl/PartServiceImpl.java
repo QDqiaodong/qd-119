@@ -58,56 +58,194 @@ public class PartServiceImpl implements PartService {
 
     @Override
     public PageResult<Part> listParts(PartQueryDTO query) {
+        boolean hasNameFilter = StringUtils.hasText(query.getName());
+        boolean hasModelFilter = StringUtils.hasText(query.getModel());
+        boolean hasShelfFilter = StringUtils.hasText(query.getShelfPosition());
+        boolean hasCategoryFilter = query.getCategoryId() != null;
+        boolean isPureShelfOrCategory = !hasNameFilter && !hasModelFilter
+                && (hasShelfFilter || hasCategoryFilter);
+
+        List<Part> allFilteredParts = null;
+        if (isPureShelfOrCategory) {
+            allFilteredParts = queryFromRedisShards(query.getShelfPosition(), query.getCategoryId());
+        }
+
+        Page<Part> result;
+        if (allFilteredParts != null) {
+            int pageNum = Math.max(query.getPage(), 1);
+            int pageSize = Math.max(query.getSize(), 1);
+            long total = allFilteredParts.size();
+            int fromIndex = Math.min((pageNum - 1) * pageSize, (int) total);
+            int toIndex = Math.min(fromIndex + pageSize, (int) total);
+            List<Part> pageRecords = allFilteredParts.subList(fromIndex, toIndex);
+            pageRecords = new java.util.ArrayList<>(pageRecords);
+            populateCategoryNames(pageRecords);
+            return new PageResult<>(pageRecords, total, pageNum, pageSize);
+        }
+
         Page<Part> page = new Page<>(query.getPage(), query.getSize());
         LambdaQueryWrapper<Part> wrapper = new LambdaQueryWrapper<>();
         wrapper.ne(Part::getDeleted, 1);
-        if (StringUtils.hasText(query.getName())) {
+        if (hasNameFilter) {
             wrapper.like(Part::getName, query.getName());
         }
-        if (StringUtils.hasText(query.getModel())) {
+        if (hasModelFilter) {
             wrapper.like(Part::getModel, query.getModel());
         }
-        if (StringUtils.hasText(query.getShelfPosition())) {
+        if (hasShelfFilter) {
             wrapper.eq(Part::getShelfPosition, query.getShelfPosition());
         }
-        if (query.getCategoryId() != null) {
+        if (hasCategoryFilter) {
             wrapper.eq(Part::getCategoryId, query.getCategoryId());
         }
         wrapper.orderByDesc(Part::getCreatedAt);
-        Page<Part> result = partMapper.selectPage(page, wrapper);
+        result = partMapper.selectPage(page, wrapper);
         populateCategoryNames(result.getRecords());
         return new PageResult<>(result.getRecords(), result.getTotal(), query.getPage(), query.getSize());
+    }
+
+    private List<Part> queryFromRedisShards(String shelfPosition, Long categoryId) {
+        boolean hasShelf = StringUtils.hasText(shelfPosition);
+        boolean hasCategory = categoryId != null;
+
+        List<Part> shelfParts = null;
+        List<Part> categoryParts = null;
+
+        if (hasShelf) {
+            try {
+                shelfParts = redisCacheService.getPartsByShelfPosition(shelfPosition);
+                logCacheProbe("READ_SHARD", "parts:shelf:" + shelfPosition, shelfParts == null ? 0 : shelfParts.size());
+            } catch (Exception e) {
+                logCacheProbe("READ_SHARD_FAIL", "parts:shelf:" + shelfPosition, -1);
+                return null;
+            }
+        }
+        if (hasCategory) {
+            try {
+                categoryParts = redisCacheService.getPartsByCategoryId(categoryId);
+                logCacheProbe("READ_SHARD", "parts:category:" + categoryId, categoryParts == null ? 0 : categoryParts.size());
+            } catch (Exception e) {
+                logCacheProbe("READ_SHARD_FAIL", "parts:category:" + categoryId, -1);
+                return null;
+            }
+        }
+
+        List<Part> result;
+        if (hasShelf && hasCategory) {
+            if (shelfParts == null || categoryParts == null) return null;
+            final java.util.Set<Long> categoryPartIds = categoryParts.stream()
+                    .map(Part::getId)
+                    .collect(Collectors.toSet());
+            result = shelfParts.stream()
+                    .filter(p -> categoryPartIds.contains(p.getId()))
+                    .sorted((a, b) -> {
+                        if (a.getCreatedAt() == null && b.getCreatedAt() == null) return 0;
+                        if (a.getCreatedAt() == null) return 1;
+                        if (b.getCreatedAt() == null) return -1;
+                        return b.getCreatedAt().compareTo(a.getCreatedAt());
+                    })
+                    .collect(Collectors.toList());
+            logCacheProbe("SHARD_INTERSECT", "shelf:" + shelfPosition + "|category:" + categoryId, result.size());
+        } else if (hasShelf) {
+            result = shelfParts == null ? null : shelfParts.stream()
+                    .sorted((a, b) -> {
+                        if (a.getCreatedAt() == null && b.getCreatedAt() == null) return 0;
+                        if (a.getCreatedAt() == null) return 1;
+                        if (b.getCreatedAt() == null) return -1;
+                        return b.getCreatedAt().compareTo(a.getCreatedAt());
+                    })
+                    .collect(Collectors.toList());
+        } else if (hasCategory) {
+            result = categoryParts == null ? null : categoryParts.stream()
+                    .sorted((a, b) -> {
+                        if (a.getCreatedAt() == null && b.getCreatedAt() == null) return 0;
+                        if (a.getCreatedAt() == null) return 1;
+                        if (b.getCreatedAt() == null) return -1;
+                        return b.getCreatedAt().compareTo(a.getCreatedAt());
+                    })
+                    .collect(Collectors.toList());
+        } else {
+            return null;
+        }
+        return result;
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PartServiceImpl.class);
+
+    private void logCacheProbe(String action, String key, int sizeOrStatus) {
+        log.info("[CACHE_PROBE] action={} key={} value={}", action, key, sizeOrStatus);
     }
 
     private void populateCategoryNames(List<Part> parts) {
         if (parts == null || parts.isEmpty()) {
             return;
         }
-        List<Long> categoryIds = parts.stream()
-                .map(Part::getCategoryId)
-                .filter(id -> id != null)
-                .distinct()
-                .collect(Collectors.toList());
+        List<Long> categoryIds;
+        try {
+            categoryIds = parts.stream()
+                    .map(Part::getCategoryId)
+                    .filter(id -> id != null && id > 0)
+                    .distinct()
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("[populateCategoryNames] extract categoryIds failed: {}", e.getMessage());
+            return;
+        }
         if (categoryIds.isEmpty()) {
             return;
         }
-        List<AccessoryCategory> categories = categoryMapper.selectBatchIds(categoryIds);
-        Map<Long, String> categoryNameMap = categories.stream()
-                .collect(Collectors.toMap(AccessoryCategory::getId, AccessoryCategory::getName));
+        List<AccessoryCategory> categories;
+        try {
+            categories = categoryMapper.selectBatchIds(categoryIds);
+        } catch (Exception e) {
+            log.warn("[populateCategoryNames] query categories failed: {}", e.getMessage());
+            return;
+        }
+        if (categories == null || categories.isEmpty()) {
+            return;
+        }
+        Map<Long, String> categoryNameMap;
+        try {
+            categoryNameMap = categories.stream()
+                    .filter(c -> c != null && c.getId() != null)
+                    .collect(Collectors.toMap(AccessoryCategory::getId, AccessoryCategory::getName, (a, b) -> a));
+        } catch (Exception e) {
+            log.warn("[populateCategoryNames] build categoryNameMap failed: {}", e.getMessage());
+            return;
+        }
         for (Part part : parts) {
-            if (part.getCategoryId() != null) {
-                part.setCategoryName(categoryNameMap.get(part.getCategoryId()));
+            if (part == null) continue;
+            try {
+                if (part.getCategoryId() != null && part.getCategoryId() > 0) {
+                    String name = categoryNameMap.get(part.getCategoryId());
+                    if (name != null) {
+                        part.setCategoryName(name);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("[populateCategoryNames] set categoryName failed for part {}: {}",
+                        part.getId(), e.getMessage());
             }
         }
     }
 
     @Override
     public Part getPartById(Long id) {
-        Part part = partMapper.selectById(id);
-        if (part != null && part.getCategoryId() != null) {
-            AccessoryCategory category = categoryMapper.selectById(part.getCategoryId());
-            if (category != null) {
-                part.setCategoryName(category.getName());
+        Part part;
+        try {
+            part = partMapper.selectById(id);
+        } catch (Exception e) {
+            log.warn("[getPartById] selectById failed: {}", e.getMessage());
+            return null;
+        }
+        if (part != null && part.getCategoryId() != null && part.getCategoryId() > 0) {
+            try {
+                AccessoryCategory category = categoryMapper.selectById(part.getCategoryId());
+                if (category != null) {
+                    part.setCategoryName(category.getName());
+                }
+            } catch (Exception e) {
+                log.warn("[getPartById] query category failed: {}", e.getMessage());
             }
         }
         return part;
@@ -166,23 +304,10 @@ public class PartServiceImpl implements PartService {
     }
 
     @Override
-    public void deletePart(Long id) {
+    public PartDeletionCheckDTO deletePart(Long id) {
         PartDeletionCheckDTO checkDTO = checkDeletionAllowed(id);
         if (!checkDTO.isCanDelete()) {
-            StringBuilder sb = new StringBuilder("该配件存在关联记录，无法删除：");
-            if (checkDTO.getInboundCount() > 0) {
-                sb.append("入库记录").append(checkDTO.getInboundCount()).append("条 ");
-            }
-            if (checkDTO.getOutboundCount() > 0) {
-                sb.append("出库记录").append(checkDTO.getOutboundCount()).append("条 ");
-            }
-            if (checkDTO.getScrapCount() > 0) {
-                sb.append("报废记录").append(checkDTO.getScrapCount()).append("条 ");
-            }
-            if (checkDTO.getInventoryCheckCount() > 0) {
-                sb.append("盘点记录").append(checkDTO.getInventoryCheckCount()).append("条");
-            }
-            throw new RuntimeException(sb.toString().trim());
+            return checkDTO;
         }
         Part part = partMapper.selectById(id);
         if (part != null) {
@@ -193,6 +318,8 @@ public class PartServiceImpl implements PartService {
             partMapper.updateById(part);
             redisCacheService.evictPartRelatedCache(id, oldShelfPosition, oldCategoryId, null, null);
         }
+        checkDTO.setCanDelete(true);
+        return checkDTO;
     }
 
     @Override
@@ -263,9 +390,15 @@ public class PartServiceImpl implements PartService {
 
     @Override
     public List<Part> getAllParts() {
-        LambdaQueryWrapper<Part> wrapper = new LambdaQueryWrapper<>();
-        wrapper.ne(Part::getDeleted, 1);
-        List<Part> parts = partMapper.selectList(wrapper);
+        List<Part> parts;
+        try {
+            LambdaQueryWrapper<Part> wrapper = new LambdaQueryWrapper<>();
+            wrapper.ne(Part::getDeleted, 1);
+            parts = partMapper.selectList(wrapper);
+        } catch (Exception e) {
+            log.warn("[getAllParts] selectList failed: {}", e.getMessage());
+            return new java.util.ArrayList<>();
+        }
         populateCategoryNames(parts);
         return parts;
     }

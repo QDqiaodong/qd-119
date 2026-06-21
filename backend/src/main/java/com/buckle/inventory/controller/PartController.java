@@ -36,9 +36,25 @@ public class PartController {
     }
 
     @DeleteMapping("/{id}")
-    public Result<Void> deletePart(@PathVariable Long id) {
-        partService.deletePart(id);
-        return Result.ok(null);
+    public Result<PartDeletionCheckDTO> deletePart(@PathVariable Long id) {
+        PartDeletionCheckDTO checkDTO = partService.deletePart(id);
+        if (!checkDTO.isCanDelete()) {
+            StringBuilder sb = new StringBuilder("该配件存在关联记录，无法删除：");
+            if (checkDTO.getInboundCount() > 0) {
+                sb.append("入库记录").append(checkDTO.getInboundCount()).append("条 ");
+            }
+            if (checkDTO.getOutboundCount() > 0) {
+                sb.append("出库记录").append(checkDTO.getOutboundCount()).append("条 ");
+            }
+            if (checkDTO.getScrapCount() > 0) {
+                sb.append("报废记录").append(checkDTO.getScrapCount()).append("条 ");
+            }
+            if (checkDTO.getInventoryCheckCount() > 0) {
+                sb.append("盘点记录").append(checkDTO.getInventoryCheckCount()).append("条");
+            }
+            return Result.error(400, sb.toString().trim(), checkDTO);
+        }
+        return Result.ok(checkDTO);
     }
 
     @GetMapping("/{id}/deletion-check")

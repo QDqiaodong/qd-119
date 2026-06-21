@@ -9,6 +9,8 @@ import com.buckle.inventory.mapper.PartMapper;
 import com.buckle.inventory.service.RedisCacheService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,8 @@ import java.util.stream.Collectors;
 @Service
 public class RedisCacheServiceImpl implements RedisCacheService {
 
+    private static final Logger log = LoggerFactory.getLogger(RedisCacheServiceImpl.class);
+
     private static final String PARTS_CACHE_KEY = "parts:common";
     private static final String PARTS_SHELF_PREFIX = "parts:shelf:";
     private static final String PARTS_CATEGORY_PREFIX = "parts:category:";
@@ -29,6 +33,10 @@ public class RedisCacheServiceImpl implements RedisCacheService {
     private static final String BRACKETS_CACHE_KEY = "parts:brackets";
     private static final String DASHBOARD_OVERVIEW_KEY = "dashboard:overview";
     private static final long CACHE_TTL_MINUTES = 30;
+
+    private void probe(String action, String key, Object value) {
+        log.info("[CACHE_PROBE] action={} key={} value={}", action, key, value);
+    }
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -85,21 +93,33 @@ public class RedisCacheServiceImpl implements RedisCacheService {
             return new ArrayList<>();
         }
         String cacheKey = PARTS_SHELF_PREFIX + shelfPosition;
-        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        probe("KEY_GEN", cacheKey, "shelf=" + shelfPosition);
+        Object cached = null;
+        try {
+            cached = redisTemplate.opsForValue().get(cacheKey);
+        } catch (Exception e) {
+            probe("READ_ERROR", cacheKey, e.getMessage());
+        }
         if (cached != null) {
             try {
-                return objectMapper.readValue(cached.toString(), new TypeReference<List<Part>>() {});
+                List<Part> result = objectMapper.readValue(cached.toString(), new TypeReference<List<Part>>() {});
+                probe("HIT", cacheKey, result.size());
+                return result;
             } catch (Exception e) {
-                redisTemplate.delete(cacheKey);
+                probe("DESERIALIZE_FAIL", cacheKey, e.getMessage());
+                try { redisTemplate.delete(cacheKey); } catch (Exception ignored) {}
             }
         }
+        probe("MISS", cacheKey, "LOAD_FROM_DB");
         LambdaQueryWrapper<Part> wrapper = new LambdaQueryWrapper<>();
         wrapper.ne(Part::getDeleted, 1).eq(Part::getShelfPosition, shelfPosition);
         List<Part> parts = partMapper.selectList(wrapper);
         try {
             redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(parts),
                     CACHE_TTL_MINUTES, TimeUnit.MINUTES);
+            probe("WRITE", cacheKey, parts.size() + "|TTL=" + CACHE_TTL_MINUTES + "m");
         } catch (Exception e) {
+            probe("WRITE_FAIL", cacheKey, e.getMessage());
             throw new RuntimeException("缓存货架配件失败", e);
         }
         return parts;
@@ -111,21 +131,33 @@ public class RedisCacheServiceImpl implements RedisCacheService {
             return new ArrayList<>();
         }
         String cacheKey = PARTS_CATEGORY_PREFIX + categoryId;
-        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        probe("KEY_GEN", cacheKey, "categoryId=" + categoryId);
+        Object cached = null;
+        try {
+            cached = redisTemplate.opsForValue().get(cacheKey);
+        } catch (Exception e) {
+            probe("READ_ERROR", cacheKey, e.getMessage());
+        }
         if (cached != null) {
             try {
-                return objectMapper.readValue(cached.toString(), new TypeReference<List<Part>>() {});
+                List<Part> result = objectMapper.readValue(cached.toString(), new TypeReference<List<Part>>() {});
+                probe("HIT", cacheKey, result.size());
+                return result;
             } catch (Exception e) {
-                redisTemplate.delete(cacheKey);
+                probe("DESERIALIZE_FAIL", cacheKey, e.getMessage());
+                try { redisTemplate.delete(cacheKey); } catch (Exception ignored) {}
             }
         }
+        probe("MISS", cacheKey, "LOAD_FROM_DB");
         LambdaQueryWrapper<Part> wrapper = new LambdaQueryWrapper<>();
         wrapper.ne(Part::getDeleted, 1).eq(Part::getCategoryId, categoryId);
         List<Part> parts = partMapper.selectList(wrapper);
         try {
             redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(parts),
                     CACHE_TTL_MINUTES, TimeUnit.MINUTES);
+            probe("WRITE", cacheKey, parts.size() + "|TTL=" + CACHE_TTL_MINUTES + "m");
         } catch (Exception e) {
+            probe("WRITE_FAIL", cacheKey, e.getMessage());
             throw new RuntimeException("缓存类别配件失败", e);
         }
         return parts;
@@ -134,7 +166,13 @@ public class RedisCacheServiceImpl implements RedisCacheService {
     @Override
     public void evictPartsByShelfPosition(String shelfPosition) {
         if (StringUtils.hasText(shelfPosition)) {
-            redisTemplate.delete(PARTS_SHELF_PREFIX + shelfPosition);
+            String key = PARTS_SHELF_PREFIX + shelfPosition;
+            try {
+                redisTemplate.delete(key);
+                probe("EVICT", key, "OK");
+            } catch (Exception e) {
+                probe("EVICT_FAIL", key, e.getMessage());
+            }
         }
         evictPartsCache();
     }
@@ -142,7 +180,13 @@ public class RedisCacheServiceImpl implements RedisCacheService {
     @Override
     public void evictPartsByCategoryId(Long categoryId) {
         if (categoryId != null) {
-            redisTemplate.delete(PARTS_CATEGORY_PREFIX + categoryId);
+            String key = PARTS_CATEGORY_PREFIX + categoryId;
+            try {
+                redisTemplate.delete(key);
+                probe("EVICT", key, "OK");
+            } catch (Exception e) {
+                probe("EVICT_FAIL", key, e.getMessage());
+            }
         }
         evictPartsCache();
     }
@@ -159,6 +203,9 @@ public class RedisCacheServiceImpl implements RedisCacheService {
     @Override
     public void evictPartRelatedCache(Long partId, String oldShelfPosition, Long oldCategoryId,
                                       String newShelfPosition, Long newCategoryId) {
+        probe("EVICT_BATCH_START", "partId=" + partId,
+                "oldShelf=" + oldShelfPosition + ",oldCat=" + oldCategoryId
+                        + ",newShelf=" + newShelfPosition + ",newCat=" + newCategoryId);
         if (StringUtils.hasText(oldShelfPosition)) {
             evictPartsByShelfPosition(oldShelfPosition);
         }
@@ -172,6 +219,7 @@ public class RedisCacheServiceImpl implements RedisCacheService {
             evictPartsByCategoryId(newCategoryId);
         }
         evictAllInventoryRelatedCache();
+        probe("EVICT_BATCH_END", "partId=" + partId, "DONE");
     }
 
     @Override
