@@ -11,7 +11,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class RecentActivity {
 
+    private Long id;
     private String type;
+    private Long recordId;
     private String description;
     private LocalDateTime time;
     private String productionLine;

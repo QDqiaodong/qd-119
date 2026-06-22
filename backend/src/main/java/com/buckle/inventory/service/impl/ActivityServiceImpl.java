@@ -225,7 +225,9 @@ public class ActivityServiceImpl implements ActivityService {
         Map<Long, Part> partCache = new HashMap<>();
         for (InboundRecord r : records) {
             ActivityEvent event = new ActivityEvent();
+            event.setId(r.getId());
             event.setType(ActivityEvent.ActivityType.INBOUND);
+            event.setRecordId(r.getId());
             event.setPartId(r.getPartId());
             event.setQuantity(r.getQuantity());
             event.setShelfPosition(r.getShelfPosition());
@@ -270,7 +272,9 @@ public class ActivityServiceImpl implements ActivityService {
         Map<Long, Part> partCache = new HashMap<>();
         for (OutboundRecord r : records) {
             ActivityEvent event = new ActivityEvent();
+            event.setId(r.getId());
             event.setType(ActivityEvent.ActivityType.OUTBOUND);
+            event.setRecordId(r.getId());
             event.setPartId(r.getPartId());
             event.setQuantity(r.getQuantity());
             event.setProductionLine(r.getProductionLine());
@@ -319,7 +323,9 @@ public class ActivityServiceImpl implements ActivityService {
         Map<Long, Part> partCache = new HashMap<>();
         for (ScrapRecord r : records) {
             ActivityEvent event = new ActivityEvent();
+            event.setId(r.getId());
             event.setType(ActivityEvent.ActivityType.SCRAP);
+            event.setRecordId(r.getId());
             event.setPartId(r.getPartId());
             event.setQuantity(r.getQuantity());
             event.setOperator(r.getOperator());
@@ -368,7 +374,9 @@ public class ActivityServiceImpl implements ActivityService {
         Map<Long, InventoryCheck> checkCache = new HashMap<>();
         for (InventoryCheckItem item : items) {
             ActivityEvent event = new ActivityEvent();
+            event.setId(item.getId());
             event.setType(ActivityEvent.ActivityType.INVENTORY_CHECK);
+            event.setRecordId(item.getCheckId());
             event.setPartId(item.getPartId());
             event.setQuantity(item.getDifference());
             event.setShelfPosition(item.getShelfPosition());

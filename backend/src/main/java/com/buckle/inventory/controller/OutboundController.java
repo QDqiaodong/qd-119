@@ -29,4 +29,9 @@ public class OutboundController {
     public Result<OutboundRecord> addOutbound(@RequestBody OutboundRequest request) {
         return Result.ok(outboundService.addOutbound(request));
     }
+
+    @GetMapping("/{id}")
+    public Result<OutboundRecord> getById(@PathVariable Long id) {
+        return Result.ok(outboundService.getById(id));
+    }
 }

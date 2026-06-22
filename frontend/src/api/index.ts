@@ -170,6 +170,7 @@ export interface BracketPart extends Part {
 export interface RecentActivity {
   id: number
   type: string
+  record_id: number
   description: string
   time: string
   production_line?: string
@@ -217,6 +218,7 @@ export const inboundApi = {
   list: (params?: Record<string, unknown>) => http.get<any, PageResult<InboundRecord>>('/api/inbound', { params }),
   create: (data: { part_id?: number; category_id?: number; part_name?: string; part_model?: string; quantity: number; shelf_position?: string; operator: string }) =>
     http.post<any, InboundRecord>('/api/inbound', data),
+  getById: (id: number) => http.get<any, InboundRecord>(`/api/inbound/${id}`),
 }
 
 export const accessoryCategoryApi = {
@@ -236,6 +238,7 @@ export const outboundApi = {
   list: (params?: Record<string, unknown>) => http.get<any, PageResult<OutboundRecord>>('/api/outbound', { params }),
   create: (data: { part_id: number; quantity: number; production_line: string; machine_id?: number | null; operator: string }) =>
     http.post<any, OutboundRecord>('/api/outbound', data),
+  getById: (id: number) => http.get<any, OutboundRecord>(`/api/outbound/${id}`),
 }
 
 export const packagingMachineApi = {
@@ -260,6 +263,7 @@ export const scrapApi = {
       ...data,
       reason: data.reasons.join(','),
     }),
+  getById: (id: number) => http.get<any, ScrapRecord>(`/api/scrap/${id}`),
 }
 
 export const scrapReasonDictApi = {

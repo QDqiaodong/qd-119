@@ -9,4 +9,6 @@ public interface ScrapService {
     PageResult<ScrapRecord> listScrap(int page, int size);
 
     ScrapRecord addScrap(ScrapRequest request);
+
+    ScrapRecord getById(Long id);
 }

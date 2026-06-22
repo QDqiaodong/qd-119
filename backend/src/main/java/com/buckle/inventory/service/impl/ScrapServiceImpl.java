@@ -44,6 +44,23 @@ public class ScrapServiceImpl implements ScrapService {
     private RedisCacheService redisCacheService;
 
     @Override
+    public ScrapRecord getById(Long id) {
+        ScrapRecord record = scrapRecordMapper.selectById(id);
+        if (record != null && (record.getPartName() == null || record.getPartModel() == null)) {
+            Part part = partMapper.selectById(record.getPartId());
+            if (part != null) {
+                if (record.getPartName() == null) {
+                    record.setPartName(part.getName());
+                }
+                if (record.getPartModel() == null) {
+                    record.setPartModel(part.getModel());
+                }
+            }
+        }
+        return record;
+    }
+
+    @Override
     public PageResult<ScrapRecord> listScrap(int page, int size) {
         Page<ScrapRecord> pageParam = new Page<>(page, size);
         Page<ScrapRecord> result = scrapRecordMapper.selectPage(pageParam,

@@ -14,7 +14,9 @@ public class ActivityEvent {
         PART_DELETE
     }
 
+    private Long id;
     private ActivityType type;
+    private Long recordId;
     private Long partId;
     private String partName;
     private String partModel;
@@ -31,10 +33,11 @@ public class ActivityEvent {
     public ActivityEvent() {
     }
 
-    public ActivityEvent(ActivityType type, Long partId, String partName, String partModel, Long categoryId,
+    public ActivityEvent(ActivityType type, Long recordId, Long partId, String partName, String partModel, Long categoryId,
                          String categoryName, String shelfPosition, String productionLine, Integer quantity,
                          String operator, LocalDateTime time, String description, String extra) {
         this.type = type;
+        this.recordId = recordId;
         this.partId = partId;
         this.partName = partName;
         this.partModel = partModel;
@@ -49,8 +52,12 @@ public class ActivityEvent {
         this.extra = extra;
     }
 
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public ActivityType getType() { return type; }
     public void setType(ActivityType type) { this.type = type; }
+    public Long getRecordId() { return recordId; }
+    public void setRecordId(Long recordId) { this.recordId = recordId; }
     public Long getPartId() { return partId; }
     public void setPartId(Long partId) { this.partId = partId; }
     public String getPartName() { return partName; }

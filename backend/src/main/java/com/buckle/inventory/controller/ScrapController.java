@@ -27,4 +27,9 @@ public class ScrapController {
     public Result<ScrapRecord> addScrap(@RequestBody ScrapRequest request) {
         return Result.ok(scrapService.addScrap(request));
     }
+
+    @GetMapping("/{id}")
+    public Result<ScrapRecord> getById(@PathVariable Long id) {
+        return Result.ok(scrapService.getById(id));
+    }
 }

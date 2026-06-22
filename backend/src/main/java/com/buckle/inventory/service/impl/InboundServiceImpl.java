@@ -53,6 +53,23 @@ public class InboundServiceImpl implements InboundService {
     private ShelfOccupancyService shelfOccupancyService;
 
     @Override
+    public InboundRecord getById(Long id) {
+        InboundRecord record = inboundRecordMapper.selectById(id);
+        if (record != null && (record.getPartName() == null || record.getPartModel() == null)) {
+            Part part = partMapper.selectById(record.getPartId());
+            if (part != null) {
+                if (record.getPartName() == null) {
+                    record.setPartName(part.getName());
+                }
+                if (record.getPartModel() == null) {
+                    record.setPartModel(part.getModel());
+                }
+            }
+        }
+        return record;
+    }
+
+    @Override
     public PageResult<InboundRecord> listInbound(int page, int size, String keyword) {
         LambdaQueryWrapper<InboundRecord> queryWrapper = new LambdaQueryWrapper<>();
 

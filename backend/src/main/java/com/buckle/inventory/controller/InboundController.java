@@ -28,4 +28,9 @@ public class InboundController {
     public Result<InboundRecord> addInbound(@RequestBody InboundRequest request) {
         return Result.ok(inboundService.addInbound(request));
     }
+
+    @GetMapping("/{id}")
+    public Result<InboundRecord> getById(@PathVariable Long id) {
+        return Result.ok(inboundService.getById(id));
+    }
 }

@@ -9,4 +9,6 @@ public interface OutboundService {
     PageResult<OutboundRecord> listOutbound(int page, int size, String productionLine, Long machineId);
 
     OutboundRecord addOutbound(OutboundRequest request);
+
+    OutboundRecord getById(Long id);
 }

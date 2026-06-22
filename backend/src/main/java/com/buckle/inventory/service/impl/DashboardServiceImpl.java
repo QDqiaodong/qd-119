@@ -159,7 +159,7 @@ public class DashboardServiceImpl implements DashboardService {
                         default:
                             type = event.getType().name();
                     }
-                    activities.add(new RecentActivity(type, event.getDescription(), event.getTime(), event.getProductionLine()));
+                    activities.add(new RecentActivity(event.getId(), type, event.getRecordId(), event.getDescription(), event.getTime(), event.getProductionLine()));
                 }
             }
             return activities;

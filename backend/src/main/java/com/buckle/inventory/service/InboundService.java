@@ -9,4 +9,6 @@ public interface InboundService {
     PageResult<InboundRecord> listInbound(int page, int size, String keyword);
 
     InboundRecord addInbound(InboundRequest request);
+
+    InboundRecord getById(Long id);
 }

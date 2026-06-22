@@ -39,6 +39,23 @@ public class OutboundServiceImpl implements OutboundService {
     private RedisCacheService redisCacheService;
 
     @Override
+    public OutboundRecord getById(Long id) {
+        OutboundRecord record = outboundRecordMapper.selectById(id);
+        if (record != null && (record.getPartName() == null || record.getPartModel() == null)) {
+            Part part = partMapper.selectById(record.getPartId());
+            if (part != null) {
+                if (record.getPartName() == null) {
+                    record.setPartName(part.getName());
+                }
+                if (record.getPartModel() == null) {
+                    record.setPartModel(part.getModel());
+                }
+            }
+        }
+        return record;
+    }
+
+    @Override
     public PageResult<OutboundRecord> listOutbound(int page, int size, String productionLine, Long machineId) {
         Page<OutboundRecord> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<OutboundRecord> wrapper = new LambdaQueryWrapper<>();
