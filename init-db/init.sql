@@ -159,3 +159,19 @@ INSERT INTO scrap_reason_dict (code, name, level, description, sort_order) VALUE
 ('RUST_JAMMED', '锈蚀卡死', '三级', '配件严重锈蚀卡死，完全无法使用', 4),
 ('OTHER', '其他', '三级', '其他报废原因', 99)
 ON DUPLICATE KEY UPDATE name=VALUES(name), level=VALUES(level), description=VALUES(description), sort_order=VALUES(sort_order);
+
+CREATE TABLE IF NOT EXISTS shelf_migration_record (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    part_id BIGINT NOT NULL COMMENT '配件ID',
+    part_name VARCHAR(100) COMMENT '配件名称(快照)',
+    part_model VARCHAR(100) COMMENT '配件型号(快照)',
+    source_shelf VARCHAR(50) NOT NULL COMMENT '原货架位置',
+    target_shelf VARCHAR(50) NOT NULL COMMENT '目标货架位置',
+    quantity INT NOT NULL COMMENT '迁移数量',
+    operator VARCHAR(50) NOT NULL COMMENT '操作人',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_part_id (part_id),
+    INDEX idx_source_shelf (source_shelf),
+    INDEX idx_target_shelf (target_shelf),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB COMMENT='货架迁移记录表';

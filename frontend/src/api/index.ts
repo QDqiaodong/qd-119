@@ -99,6 +99,18 @@ export interface ScrapRecord {
   created_at: string
 }
 
+export interface ShelfMigrationRecord {
+  id: number
+  part_id: number
+  part_name: string
+  part_model: string
+  source_shelf: string
+  target_shelf: string
+  quantity: number
+  operator: string
+  created_at: string
+}
+
 export interface ScrapReasonDict {
   id: number
   code: string
@@ -271,4 +283,10 @@ export const bracketApi = {
   list: (params?: Record<string, unknown>) => http.get<any, PageResult<BracketPart>>('/api/brackets', { params }),
   getLastInboundTime: (partId: number) =>
     http.get<any, { last_inbound_time: string }>(`/api/brackets/${partId}/last-inbound`),
+}
+
+export const shelfMigrationApi = {
+  list: (params?: Record<string, unknown>) => http.get<any, PageResult<ShelfMigrationRecord>>('/api/shelf-migration', { params }),
+  create: (data: { part_id: number; quantity: number; target_shelf: string; operator: string }) =>
+    http.post<any, ShelfMigrationRecord>('/api/shelf-migration', data),
 }

@@ -8,6 +8,7 @@ import ScrapPage from '@/pages/ScrapPage.vue'
 import PartsPage from '@/pages/PartsPage.vue'
 import BuckleModelWall from '@/pages/BuckleModelWall.vue'
 import BracketSizeDashboard from '@/pages/BracketSizeDashboard.vue'
+import ShelfMigrationPage from '@/pages/ShelfMigrationPage.vue'
 
 const routes = [
   {
@@ -17,6 +18,7 @@ const routes = [
       { path: '', name: 'dashboard', component: DashboardPage },
       { path: 'inbound', name: 'inbound', component: InboundPage },
       { path: 'outbound', name: 'outbound', component: OutboundPage },
+      { path: 'shelf-migration', name: 'shelf-migration', component: ShelfMigrationPage },
       { path: 'inventory', name: 'inventory', component: InventoryPage },
       { path: 'scrap', name: 'scrap', component: ScrapPage },
       { path: 'parts', name: 'parts', component: PartsPage },
