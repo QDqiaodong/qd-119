@@ -37,4 +37,14 @@ public class InventoryCheckController {
     public Result<java.util.List<String>> listAvailableQuarters() {
         return Result.ok(inventoryCheckService.listAvailableQuarters());
     }
+
+    @PostMapping("/{id}/complete")
+    public Result<InventoryCheck> completeCheck(@PathVariable Long id) {
+        return Result.ok(inventoryCheckService.completeCheck(id));
+    }
+
+    @GetMapping("/quarters/{quarter}/locked")
+    public Result<Boolean> isQuarterLocked(@PathVariable String quarter) {
+        return Result.ok(inventoryCheckService.isQuarterLocked(quarter));
+    }
 }

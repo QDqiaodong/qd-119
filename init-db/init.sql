@@ -105,8 +105,10 @@ CREATE TABLE IF NOT EXISTS inventory_check (
     match_count INT NOT NULL DEFAULT 0 COMMENT '账实相符数',
     diff_count INT NOT NULL DEFAULT 0 COMMENT '差异数',
     operator VARCHAR(50) NOT NULL COMMENT '操作人',
+    status TINYINT NOT NULL DEFAULT 0 COMMENT '状态 0-进行中 1-已完成',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_quarter (quarter)
+    INDEX idx_quarter (quarter),
+    INDEX idx_status (status)
 ) ENGINE=InnoDB COMMENT='盘点主表';
 
 CREATE TABLE IF NOT EXISTS inventory_check_item (

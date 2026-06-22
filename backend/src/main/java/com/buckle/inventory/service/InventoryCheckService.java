@@ -15,4 +15,8 @@ public interface InventoryCheckService {
     java.util.List<String> listAvailableQuarters();
 
     String normalizeQuarter(String quarter);
+
+    InventoryCheck completeCheck(Long id);
+
+    boolean isQuarterLocked(String quarter);
 }

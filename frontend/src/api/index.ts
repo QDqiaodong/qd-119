@@ -131,6 +131,7 @@ export interface InventoryRecord {
   match_count: number
   diff_count: number
   operator: string
+  status: number
   created_at: string
   items: InventoryItem[]
 }
@@ -254,6 +255,8 @@ export const inventoryApi = {
     http.post<any, InventoryRecord>('/api/inventory', data),
   getDetail: (id: number) => http.get<any, InventoryRecord>(`/api/inventory/${id}`),
   listQuarters: () => http.get<any, string[]>('/api/inventory/quarters'),
+  complete: (id: number) => http.post<any, InventoryRecord>(`/api/inventory/${id}/complete`),
+  isQuarterLocked: (quarter: string) => http.get<any, boolean>(`/api/inventory/quarters/${quarter}/locked`),
 }
 
 export const scrapApi = {

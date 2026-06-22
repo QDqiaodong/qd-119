@@ -35,6 +35,9 @@ public class InventoryCheck {
     @TableField("operator")
     private String operator;
 
+    @TableField("status")
+    private Integer status;
+
     @TableField("created_at")
     private LocalDateTime createdAt;
 

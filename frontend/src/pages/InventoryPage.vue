@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { ClipboardCheck, ChevronDown, ChevronRight, Loader2, TrendingUp, TrendingDown, Check } from 'lucide-vue-next'
+import { ClipboardCheck, ChevronDown, ChevronRight, Loader2, TrendingUp, TrendingDown, Check, Lock, Unlock, CheckCircle2 } from 'lucide-vue-next'
 import { inventoryApi, partsApi, type InventoryRecord, type Part, type InventoryItem } from '@/api'
 import Toast from '@/components/Toast.vue'
 import useInventoryRefresh from '@/composables/useInventoryRefresh'
@@ -9,6 +9,7 @@ const { inventoryVersion, refreshInventory } = useInventoryRefresh()
 
 const loading = ref(true)
 const submitLoading = ref(false)
+const completeLoading = ref<number | null>(null)
 const records = ref<InventoryRecord[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -26,11 +27,36 @@ const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') 
 
 const quarter = ref('')
 const quarters = ref<string[]>([])
+const quarterLocked = ref(false)
 const operator = ref('')
 const allParts = ref<Part[]>([])
 const checkItems = ref<{ part_id: number; part_name: string; part_model: string; shelf_position: string; book_quantity: number; actual_quantity: number }[]>([])
 const expandedId = ref<number | null>(null)
 const expandedSections = ref<Record<number, Record<string, boolean>>>({})
+
+const getStatusLabel = (status: number) => {
+  return status === 0 ? '进行中' : '已完成'
+}
+
+const getStatusClass = (status: number) => {
+  return status === 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+}
+
+const checkQuarterLocked = async (q: string) => {
+  if (!q) {
+    quarterLocked.value = false
+    return
+  }
+  try {
+    quarterLocked.value = await inventoryApi.isQuarterLocked(q)
+  } catch {
+    quarterLocked.value = false
+  }
+}
+
+watch(quarter, (newVal) => {
+  checkQuarterLocked(newVal)
+})
 
 const ensureExpandedSections = (recordId: number) => {
   if (!expandedSections.value[recordId]) {
@@ -102,6 +128,10 @@ const onSubmit = async () => {
     showToast('无配件数据可盘点', 'error')
     return
   }
+  if (quarterLocked.value) {
+    showToast('该季度盘点正在进行中，无法重复发起', 'error')
+    return
+  }
 
   try {
     submitLoading.value = true
@@ -117,10 +147,25 @@ const onSubmit = async () => {
     quarter.value = ''
     operator.value = ''
     refreshInventory()
-  } catch {
-    showToast('盘点提交失败', 'error')
+  } catch (e) {
+    const err = e as Error
+    showToast(err.message || '盘点提交失败', 'error')
   } finally {
     submitLoading.value = false
+  }
+}
+
+const onComplete = async (id: number) => {
+  try {
+    completeLoading.value = id
+    await inventoryApi.complete(id)
+    showToast('盘点已完成')
+    refreshInventory()
+  } catch (e) {
+    const err = e as Error
+    showToast(err.message || '操作失败', 'error')
+  } finally {
+    completeLoading.value = null
   }
 }
 
@@ -183,11 +228,18 @@ onMounted(() => {
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">盘点季度</label>
-          <select v-model="quarter"
-            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-            <option value="">-- 请选择 --</option>
-            <option v-for="q in quarters" :key="q" :value="q">{{ q }}</option>
-          </select>
+          <div class="relative">
+            <select v-model="quarter"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="">-- 请选择 --</option>
+              <option v-for="q in quarters" :key="q" :value="q">{{ q }}</option>
+            </select>
+            <div v-if="quarter && quarterLocked" class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-yellow-600">
+              <Lock :size="14" />
+              <span class="text-xs">锁定中</span>
+            </div>
+          </div>
+          <p v-if="quarterLocked" class="text-xs text-yellow-600 mt-1">该季度盘点正在进行中，完成后可再次发起</p>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">操作人</label>
@@ -232,11 +284,12 @@ onMounted(() => {
         </table>
       </div>
 
-      <button @click="onSubmit" :disabled="submitLoading"
+      <button @click="onSubmit" :disabled="submitLoading || quarterLocked"
         class="bg-primary-800 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center">
         <Loader2 v-if="submitLoading" :size="16" class="mr-2 animate-spin" />
+        <Lock v-else-if="quarterLocked" :size="16" class="mr-2" />
         <ClipboardCheck v-else :size="16" class="mr-2" />
-        提交盘点
+        {{ quarterLocked ? '季度已锁定' : '提交盘点' }}
       </button>
     </div>
 
@@ -255,16 +308,18 @@ onMounted(() => {
                 <th class="text-left py-3 px-4 font-medium w-8"></th>
                 <th class="text-left py-3 px-4 font-medium">序号</th>
                 <th class="text-left py-3 px-4 font-medium">盘点季度</th>
+                <th class="text-left py-3 px-4 font-medium">状态</th>
                 <th class="text-left py-3 px-4 font-medium">配件总数</th>
                 <th class="text-left py-3 px-4 font-medium">相符数</th>
                 <th class="text-left py-3 px-4 font-medium">差异数</th>
                 <th class="text-left py-3 px-4 font-medium">操作人</th>
                 <th class="text-left py-3 px-4 font-medium">盘点时间</th>
+                <th class="text-left py-3 px-4 font-medium">操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="records.length === 0">
-                <td colspan="8" class="text-center py-8 text-gray-400">暂无盘点记录</td>
+                <td colspan="10" class="text-center py-8 text-gray-400">暂无盘点记录</td>
               </tr>
               <template v-for="(r, i) in records" :key="r.id">
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
@@ -274,6 +329,12 @@ onMounted(() => {
                   </td>
                   <td class="py-3 px-4">{{ (page - 1) * pageSize + i + 1 }}</td>
                   <td class="py-3 px-4 text-gray-800">{{ r.quarter }}</td>
+                  <td class="py-3 px-4">
+                    <span :class="['px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1', getStatusClass(r.status)]">
+                      <component :is="r.status === 0 ? Unlock : CheckCircle2" :size="12" />
+                      {{ getStatusLabel(r.status) }}
+                    </span>
+                  </td>
                   <td class="py-3 px-4">{{ r.total_count }}</td>
                   <td class="py-3 px-4 text-success">{{ r.match_count }}</td>
                   <td class="py-3 px-4">
@@ -281,9 +342,21 @@ onMounted(() => {
                   </td>
                   <td class="py-3 px-4">{{ r.operator }}</td>
                   <td class="py-3 px-4 text-gray-400">{{ r.created_at }}</td>
+                  <td class="py-3 px-4" @click.stop>
+                    <button
+                      v-if="r.status === 0"
+                      @click="onComplete(r.id)"
+                      :disabled="completeLoading === r.id"
+                      class="text-primary-600 hover:text-primary-800 text-sm font-medium flex items-center gap-1 disabled:opacity-50">
+                      <Loader2 v-if="completeLoading === r.id" :size="14" class="animate-spin" />
+                      <Check v-else :size="14" />
+                      完成盘点
+                    </button>
+                    <span v-else class="text-gray-400 text-sm">-</span>
+                  </td>
                 </tr>
                 <tr v-if="expandedId === r.id && r.items?.length">
-                  <td colspan="8" class="bg-gray-50 px-6 py-4">
+                  <td colspan="10" class="bg-gray-50 px-6 py-4">
                     <div class="space-y-3">
                       <template v-for="section in [
                         { key: 'surplus', title: '盘盈', icon: TrendingUp, items: getSurplusItems(r.items), badgeClass: 'bg-primary-100 text-primary-800', borderClass: 'border-l-primary-500' },

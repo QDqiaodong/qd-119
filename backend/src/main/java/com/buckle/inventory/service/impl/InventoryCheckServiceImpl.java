@@ -46,9 +46,15 @@ public class InventoryCheckServiceImpl implements InventoryCheckService {
     @Override
     @Transactional
     public InventoryCheck addCheck(InventoryCheckRequest request) {
+        String normalizedQuarter = normalizeQuarter(request.getQuarter());
+        if (isQuarterLocked(normalizedQuarter)) {
+            throw new RuntimeException("该季度盘点正在进行中，无法重复发起");
+        }
+
         InventoryCheck check = new InventoryCheck();
-        check.setQuarter(normalizeQuarter(request.getQuarter()));
+        check.setQuarter(normalizedQuarter);
         check.setOperator(request.getOperator());
+        check.setStatus(0);
         check.setCreatedAt(LocalDateTime.now());
 
         int matchCount = 0;
@@ -151,6 +157,31 @@ public class InventoryCheckServiceImpl implements InventoryCheckService {
         }
         Collections.reverse(result);
         return result;
+    }
+
+    @Override
+    @Transactional
+    public InventoryCheck completeCheck(Long id) {
+        InventoryCheck check = inventoryCheckMapper.selectById(id);
+        if (check == null) {
+            throw new RuntimeException("盘点记录不存在");
+        }
+        if (check.getStatus() != null && check.getStatus() == 1) {
+            throw new RuntimeException("该盘点已完成，无需重复操作");
+        }
+        check.setStatus(1);
+        inventoryCheckMapper.updateById(check);
+        return check;
+    }
+
+    @Override
+    public boolean isQuarterLocked(String quarter) {
+        String normalizedQuarter = normalizeQuarter(quarter);
+        Long count = inventoryCheckMapper.selectCount(
+                new LambdaQueryWrapper<InventoryCheck>()
+                        .eq(InventoryCheck::getQuarter, normalizedQuarter)
+                        .eq(InventoryCheck::getStatus, 0));
+        return count != null && count > 0;
     }
 
     @Override
