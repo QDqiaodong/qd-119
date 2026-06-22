@@ -1,5 +1,5 @@
 server:
-  port: 8103
+  port: 8119
 
 shelf:
   max-part-types: 10
@@ -9,14 +9,14 @@ spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
   datasource:
-    url: jdbc:mysql://localhost:3319/buckle_inventory?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3369/buckle_inventory?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
     username: root
     password: root123
     driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
       host: localhost
-      port: 6392
+      port: 6319
       timeout: 3000ms
 
 mybatis-plus:

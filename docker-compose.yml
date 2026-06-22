@@ -42,7 +42,7 @@ services:
         DOCKER_REGISTRY: ${DOCKER_REGISTRY}
     container_name: ${PROJECT_NAME}-backend
     ports:
-      - "127.0.0.1:${BACKEND_PORT}:8103"
+      - "127.0.0.1:${BACKEND_PORT}:8119"
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
       SPRING_DATASOURCE_USERNAME: root
