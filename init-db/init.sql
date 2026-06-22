@@ -177,3 +177,82 @@ CREATE TABLE IF NOT EXISTS shelf_migration_record (
     INDEX idx_target_shelf (target_shelf),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB COMMENT='货架迁移记录表';
+
+CREATE TABLE IF NOT EXISTS buckle_package (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL COMMENT '成套包名称',
+    code VARCHAR(50) NOT NULL COMMENT '成套包编码',
+    description VARCHAR(500) COMMENT '成套包描述',
+    status TINYINT NOT NULL DEFAULT 1 COMMENT '状态 0-停用 1-启用',
+    sort_order INT NOT NULL DEFAULT 0 COMMENT '排序',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_code (code),
+    INDEX idx_name (name),
+    INDEX idx_status (status)
+) ENGINE=InnoDB COMMENT='卡扣成套包表';
+
+CREATE TABLE IF NOT EXISTS buckle_package_item (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    package_id BIGINT NOT NULL COMMENT '成套包ID',
+    part_id BIGINT NOT NULL COMMENT '配件ID',
+    quantity INT NOT NULL DEFAULT 1 COMMENT '数量',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_package_part (package_id, part_id),
+    INDEX idx_package_id (package_id),
+    INDEX idx_part_id (part_id)
+) ENGINE=InnoDB COMMENT='成套包明细表';
+
+CREATE TABLE IF NOT EXISTS package_inbound_record (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    package_id BIGINT NOT NULL COMMENT '成套包ID',
+    package_name VARCHAR(100) COMMENT '成套包名称(快照)',
+    package_code VARCHAR(50) COMMENT '成套包编码(快照)',
+    package_quantity INT NOT NULL COMMENT '成套包入库数量',
+    operator VARCHAR(50) NOT NULL COMMENT '操作人',
+    remark VARCHAR(500) COMMENT '备注',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_package_id (package_id),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB COMMENT='成套包入库记录表';
+
+CREATE TABLE IF NOT EXISTS package_inbound_detail (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    record_id BIGINT NOT NULL COMMENT '入库记录ID',
+    part_id BIGINT NOT NULL COMMENT '配件ID',
+    part_name VARCHAR(100) COMMENT '配件名称(快照)',
+    part_model VARCHAR(100) COMMENT '配件型号(快照)',
+    quantity INT NOT NULL COMMENT '入库数量',
+    shelf_position VARCHAR(50) COMMENT '货架位置',
+    INDEX idx_record_id (record_id),
+    INDEX idx_part_id (part_id)
+) ENGINE=InnoDB COMMENT='成套包入库明细表';
+
+CREATE TABLE IF NOT EXISTS package_outbound_record (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    package_id BIGINT NOT NULL COMMENT '成套包ID',
+    package_name VARCHAR(100) COMMENT '成套包名称(快照)',
+    package_code VARCHAR(50) COMMENT '成套包编码(快照)',
+    package_quantity INT NOT NULL COMMENT '成套包出库数量',
+    production_line VARCHAR(50) NOT NULL COMMENT '领用产线',
+    machine_id BIGINT NULL COMMENT '包装机机台ID',
+    machine_code VARCHAR(50) NULL COMMENT '机台编号(快照)',
+    operator VARCHAR(50) NOT NULL COMMENT '操作人',
+    remark VARCHAR(500) COMMENT '备注',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_package_id (package_id),
+    INDEX idx_created_at (created_at),
+    INDEX idx_production_line (production_line),
+    INDEX idx_machine_id (machine_id)
+) ENGINE=InnoDB COMMENT='成套包出库记录表';
+
+CREATE TABLE IF NOT EXISTS package_outbound_detail (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    record_id BIGINT NOT NULL COMMENT '出库记录ID',
+    part_id BIGINT NOT NULL COMMENT '配件ID',
+    part_name VARCHAR(100) COMMENT '配件名称(快照)',
+    part_model VARCHAR(100) COMMENT '配件型号(快照)',
+    quantity INT NOT NULL COMMENT '出库数量',
+    INDEX idx_record_id (record_id),
+    INDEX idx_part_id (part_id)
+) ENGINE=InnoDB COMMENT='成套包出库明细表';

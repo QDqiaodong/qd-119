@@ -11,6 +11,8 @@ import {
   Cog,
   Grid3X3,
   Ruler,
+  Boxes,
+  Package,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -20,10 +22,13 @@ const navItems = [
   { label: '首页', icon: LayoutDashboard, path: '/' },
   { label: '配件入库', icon: PackagePlus, path: '/inbound' },
   { label: '领用出库', icon: PackageMinus, path: '/outbound' },
+  { label: '成套包入库', icon: Boxes, path: '/package-inbound' },
+  { label: '成套包出库', icon: Package, path: '/package-outbound' },
   { label: '货架迁移', icon: ArrowRightLeft, path: '/shelf-migration' },
   { label: '季度盘点', icon: ClipboardCheck, path: '/inventory' },
   { label: '报废登记', icon: Trash2, path: '/scrap' },
   { label: '配件清单', icon: List, path: '/parts' },
+  { label: '成套包管理', icon: Package, path: '/buckle-packages' },
   { label: '卡扣型号墙', icon: Grid3X3, path: '/buckle-wall' },
   { label: '支架尺寸看板', icon: Ruler, path: '/bracket-dashboard' },
 ]

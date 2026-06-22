@@ -298,3 +298,99 @@ export const shelfMigrationApi = {
   create: (data: { part_id: number; quantity: number; target_shelf: string; operator: string }) =>
     http.post<any, ShelfMigrationRecord>('/api/shelf-migration', data),
 }
+
+export interface BucklePackageItem {
+  id: number
+  package_id: number
+  part_id: number
+  quantity: number
+  part_name?: string
+  part_model?: string
+  current_stock?: number
+  shelf_position?: string
+  created_at: string
+}
+
+export interface BucklePackage {
+  id: number
+  name: string
+  code: string
+  description?: string
+  status: number
+  sort_order: number
+  created_at: string
+  updated_at: string
+  items?: BucklePackageItem[]
+}
+
+export interface PackageInboundDetail {
+  id: number
+  record_id: number
+  part_id: number
+  part_name: string
+  part_model: string
+  quantity: number
+  shelf_position: string
+}
+
+export interface PackageInboundRecord {
+  id: number
+  package_id: number
+  package_name: string
+  package_code: string
+  package_quantity: number
+  operator: string
+  remark?: string
+  created_at: string
+  details?: PackageInboundDetail[]
+}
+
+export interface PackageOutboundDetail {
+  id: number
+  record_id: number
+  part_id: number
+  part_name: string
+  part_model: string
+  quantity: number
+}
+
+export interface PackageOutboundRecord {
+  id: number
+  package_id: number
+  package_name: string
+  package_code: string
+  package_quantity: number
+  production_line: string
+  machine_id?: number | null
+  machine_code?: string | null
+  operator: string
+  remark?: string
+  created_at: string
+  details?: PackageOutboundDetail[]
+}
+
+export const bucklePackageApi = {
+  list: (params?: Record<string, unknown>) => http.get<any, PageResult<BucklePackage>>('/api/buckle-packages', { params }),
+  listEnabled: () => http.get<any, BucklePackage[]>('/api/buckle-packages/enabled'),
+  getById: (id: number) => http.get<any, BucklePackage>(`/api/buckle-packages/${id}`),
+  getDetail: (id: number) => http.get<any, BucklePackage>(`/api/buckle-packages/${id}/detail`),
+  create: (data: { name: string; code: string; description?: string; status?: number; sort_order?: number; items: { part_id: number; quantity: number }[] }) =>
+    http.post<any, BucklePackage>('/api/buckle-packages', data),
+  update: (id: number, data: { name: string; code: string; description?: string; status?: number; sort_order?: number; items: { part_id: number; quantity: number }[] }) =>
+    http.put<any, BucklePackage>(`/api/buckle-packages/${id}`, data),
+  remove: (id: number) => http.delete(`/api/buckle-packages/${id}`),
+}
+
+export const packageInboundApi = {
+  list: (params?: Record<string, unknown>) => http.get<any, PageResult<PackageInboundRecord>>('/api/package-inbound', { params }),
+  getById: (id: number) => http.get<any, PackageInboundRecord>(`/api/package-inbound/${id}`),
+  create: (data: { package_id: number; package_quantity: number; operator: string; remark?: string }) =>
+    http.post<any, PackageInboundRecord>('/api/package-inbound', data),
+}
+
+export const packageOutboundApi = {
+  list: (params?: Record<string, unknown>) => http.get<any, PageResult<PackageOutboundRecord>>('/api/package-outbound', { params }),
+  getById: (id: number) => http.get<any, PackageOutboundRecord>(`/api/package-outbound/${id}`),
+  create: (data: { package_id: number; package_quantity: number; production_line: string; machine_id?: number | null; operator: string; remark?: string }) =>
+    http.post<any, PackageOutboundRecord>('/api/package-outbound', data),
+}
