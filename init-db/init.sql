@@ -60,12 +60,43 @@ CREATE TABLE IF NOT EXISTS outbound_record (
     part_model VARCHAR(100) COMMENT '配件型号(快照)',
     quantity INT NOT NULL COMMENT '出库数量',
     production_line VARCHAR(50) NOT NULL COMMENT '领用产线',
+    machine_id BIGINT NULL COMMENT '包装机机台ID',
+    machine_code VARCHAR(50) NULL COMMENT '机台编号(快照)',
     operator VARCHAR(50) NOT NULL COMMENT '操作人',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_part_id (part_id),
     INDEX idx_created_at (created_at),
-    INDEX idx_production_line (production_line)
+    INDEX idx_production_line (production_line),
+    INDEX idx_machine_id (machine_id)
 ) ENGINE=InnoDB COMMENT='出库流水表';
+
+CREATE TABLE IF NOT EXISTS packaging_machine (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    machine_code VARCHAR(50) NOT NULL COMMENT '机台编号',
+    machine_name VARCHAR(100) COMMENT '机台名称',
+    production_line VARCHAR(50) NOT NULL COMMENT '所属产线',
+    status TINYINT NOT NULL DEFAULT 1 COMMENT '状态 0-停用 1-启用',
+    sort_order INT NOT NULL DEFAULT 0 COMMENT '排序',
+    remark VARCHAR(200) COMMENT '备注',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_machine_code (machine_code),
+    INDEX idx_production_line (production_line),
+    INDEX idx_status (status)
+) ENGINE=InnoDB COMMENT='包装机机台表';
+
+INSERT INTO packaging_machine (machine_code, machine_name, production_line, sort_order) VALUES
+('BZ-A01', '包装机A01', '产线A', 1),
+('BZ-A02', '包装机A02', '产线A', 2),
+('BZ-A03', '包装机A03', '产线A', 3),
+('BZ-B01', '包装机B01', '产线B', 1),
+('BZ-B02', '包装机B02', '产线B', 2),
+('BZ-B03', '包装机B03', '产线B', 3),
+('BZ-C01', '包装机C01', '产线C', 1),
+('BZ-C02', '包装机C02', '产线C', 2),
+('BZ-D01', '包装机D01', '产线D', 1),
+('BZ-D02', '包装机D02', '产线D', 2)
+ON DUPLICATE KEY UPDATE machine_name=VALUES(machine_name), production_line=VALUES(production_line);
 
 CREATE TABLE IF NOT EXISTS inventory_check (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

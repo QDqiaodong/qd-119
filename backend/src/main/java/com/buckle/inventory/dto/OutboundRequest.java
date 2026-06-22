@@ -12,5 +12,6 @@ public class OutboundRequest {
     private Long partId;
     private Integer quantity;
     private String productionLine;
+    private Long machineId;
     private String operator;
 }

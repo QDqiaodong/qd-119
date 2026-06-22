@@ -20,8 +20,9 @@ public class OutboundController {
     public Result<PageResult<OutboundRecord>> listOutbound(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String productionLine) {
-        return Result.ok(outboundService.listOutbound(page, size, productionLine));
+            @RequestParam(required = false) String productionLine,
+            @RequestParam(required = false) Long machineId) {
+        return Result.ok(outboundService.listOutbound(page, size, productionLine, machineId));
     }
 
     @PostMapping

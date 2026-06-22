@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { PackageMinus, Search, Loader2 } from 'lucide-vue-next'
-import { outboundApi, partsApi, type OutboundRecord, type Part } from '@/api'
+import { outboundApi, partsApi, packagingMachineApi, type OutboundRecord, type Part, type PackagingMachine } from '@/api'
 import Toast from '@/components/Toast.vue'
 import ProductionLineBadge from '@/components/ProductionLineBadge.vue'
+import MachineBadge from '@/components/MachineBadge.vue'
 import useInventoryRefresh from '@/composables/useInventoryRefresh'
 
 const { inventoryVersion, refreshInventory } = useInventoryRefresh()
@@ -12,6 +13,7 @@ const loading = ref(true)
 const submitLoading = ref(false)
 const records = ref<OutboundRecord[]>([])
 const parts = ref<Part[]>([])
+const machines = ref<PackagingMachine[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 10
@@ -29,9 +31,15 @@ const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') 
 const selectedPartId = ref<number | null>(null)
 const quantity = ref(1)
 const productionLine = ref('')
+const selectedMachineId = ref<number | null>(null)
 const operator = ref('')
 
 const productionLines = ['产线A', '产线B', '产线C', '产线D']
+
+const filteredMachines = computed(() => {
+  if (!productionLine.value) return []
+  return machines.value.filter((m) => m.production_line === productionLine.value)
+})
 
 const selectedPart = computed(() =>
   parts.value.find((p) => p.id === selectedPartId.value),
@@ -41,6 +49,7 @@ const resetForm = () => {
   selectedPartId.value = null
   quantity.value = 1
   productionLine.value = ''
+  selectedMachineId.value = null
   operator.value = ''
 }
 
@@ -66,6 +75,15 @@ const fetchParts = async () => {
   }
 }
 
+const fetchMachines = async () => {
+  try {
+    const res = await packagingMachineApi.list()
+    machines.value = res ?? []
+  } catch {
+    machines.value = []
+  }
+}
+
 const onSubmit = async () => {
   if (!selectedPartId.value) {
     showToast('请选择配件', 'error')
@@ -79,6 +97,10 @@ const onSubmit = async () => {
     showToast('请选择领用产线', 'error')
     return
   }
+  if (!selectedMachineId.value) {
+    showToast('请选择包装机机台', 'error')
+    return
+  }
   if (!operator.value) {
     showToast('请填写操作人', 'error')
     return
@@ -90,6 +112,7 @@ const onSubmit = async () => {
       part_id: selectedPartId.value,
       quantity: quantity.value,
       production_line: productionLine.value,
+      machine_id: selectedMachineId.value,
       operator: operator.value,
     })
     showToast('出库登记成功')
@@ -110,14 +133,20 @@ const changePage = (p: number) => {
   fetchRecords()
 }
 
+watch(productionLine, () => {
+  selectedMachineId.value = null
+})
+
 watch(inventoryVersion, () => {
   fetchRecords()
   fetchParts()
+  fetchMachines()
 })
 
 onMounted(() => {
   fetchRecords()
   fetchParts()
+  fetchMachines()
 })
 </script>
 
@@ -126,7 +155,7 @@ onMounted(() => {
     <h1 class="text-2xl font-bold text-primary-800 mb-6">车间领用出库登记</h1>
 
     <div class="bg-white rounded-lg shadow p-6 mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">选择配件</label>
           <select v-model="selectedPartId"
@@ -143,6 +172,16 @@ onMounted(() => {
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
             <option value="">-- 请选择 --</option>
             <option v-for="line in productionLines" :key="line" :value="line">{{ line }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">包装机机台</label>
+          <select v-model="selectedMachineId" :disabled="!productionLine"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400">
+            <option :value="null">-- 请选择 --</option>
+            <option v-for="m in filteredMachines" :key="m.id" :value="m.id">
+              {{ m.machine_code }} {{ m.machine_name }}
+            </option>
           </select>
         </div>
         <div>
@@ -190,13 +229,14 @@ onMounted(() => {
                 <th class="text-left py-3 px-4 font-medium">型号</th>
                 <th class="text-left py-3 px-4 font-medium">领用数量</th>
                 <th class="text-left py-3 px-4 font-medium">领用产线</th>
+                <th class="text-left py-3 px-4 font-medium">包装机台</th>
                 <th class="text-left py-3 px-4 font-medium">操作人</th>
                 <th class="text-left py-3 px-4 font-medium">出库时间</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="records.length === 0">
-                <td colspan="7" class="text-center py-8 text-gray-400">暂无出库记录</td>
+                <td colspan="8" class="text-center py-8 text-gray-400">暂无出库记录</td>
               </tr>
               <tr v-for="(r, i) in records" :key="r.id"
                 class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
@@ -206,6 +246,10 @@ onMounted(() => {
                 <td class="py-3 px-4 text-danger font-medium">-{{ r.quantity }}</td>
                 <td class="py-3 px-4">
                   <ProductionLineBadge :line="r.production_line" />
+                </td>
+                <td class="py-3 px-4">
+                  <MachineBadge :code="r.machine_code" />
+                  <span v-if="!r.machine_code" class="text-gray-300 text-xs">-</span>
                 </td>
                 <td class="py-3 px-4">{{ r.operator }}</td>
                 <td class="py-3 px-4 text-gray-400">{{ r.created_at }}</td>

@@ -13,36 +13,33 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("outbound_record")
-public class OutboundRecord {
+@TableName("packaging_machine")
+public class PackagingMachine {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    @TableField("part_id")
-    private Long partId;
+    @TableField("machine_code")
+    private String machineCode;
 
-    @TableField("quantity")
-    private Integer quantity;
+    @TableField("machine_name")
+    private String machineName;
 
     @TableField("production_line")
     private String productionLine;
 
-    @TableField("machine_id")
-    private Long machineId;
+    @TableField("status")
+    private Integer status;
 
-    @TableField("machine_code")
-    private String machineCode;
+    @TableField("sort_order")
+    private Integer sortOrder;
 
-    @TableField("operator")
-    private String operator;
+    @TableField("remark")
+    private String remark;
 
     @TableField("created_at")
     private LocalDateTime createdAt;
 
-    @TableField("part_name")
-    private String partName;
-
-    @TableField("part_model")
-    private String partModel;
+    @TableField("updated_at")
+    private LocalDateTime updatedAt;
 }

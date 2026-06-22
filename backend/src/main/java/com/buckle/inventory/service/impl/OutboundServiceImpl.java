@@ -7,7 +7,9 @@ import com.buckle.inventory.dto.PageResult;
 import com.buckle.inventory.entity.OutboundRecord;
 import com.buckle.inventory.entity.Part;
 import com.buckle.inventory.mapper.OutboundRecordMapper;
+import com.buckle.inventory.entity.PackagingMachine;
 import com.buckle.inventory.mapper.PartMapper;
+import com.buckle.inventory.mapper.PackagingMachineMapper;
 import com.buckle.inventory.service.OutboundService;
 import com.buckle.inventory.service.RedisCacheService;
 import org.slf4j.Logger;
@@ -31,14 +33,20 @@ public class OutboundServiceImpl implements OutboundService {
     private PartMapper partMapper;
 
     @Autowired
+    private PackagingMachineMapper packagingMachineMapper;
+
+    @Autowired
     private RedisCacheService redisCacheService;
 
     @Override
-    public PageResult<OutboundRecord> listOutbound(int page, int size, String productionLine) {
+    public PageResult<OutboundRecord> listOutbound(int page, int size, String productionLine, Long machineId) {
         Page<OutboundRecord> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<OutboundRecord> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(productionLine)) {
             wrapper.eq(OutboundRecord::getProductionLine, productionLine);
+        }
+        if (machineId != null) {
+            wrapper.eq(OutboundRecord::getMachineId, machineId);
         }
         wrapper.orderByDesc(OutboundRecord::getCreatedAt);
         Page<OutboundRecord> result = outboundRecordMapper.selectPage(pageParam, wrapper);
@@ -105,10 +113,24 @@ public class OutboundServiceImpl implements OutboundService {
 
         Part updatedPart = partMapper.selectById(request.getPartId());
 
+        String machineCode = null;
+        if (request.getMachineId() != null) {
+            PackagingMachine machine = packagingMachineMapper.selectById(request.getMachineId());
+            if (machine == null) {
+                throw new RuntimeException("机台不存在");
+            }
+            if (machine.getStatus() == null || machine.getStatus() != 1) {
+                throw new RuntimeException("机台已停用，无法领用");
+            }
+            machineCode = machine.getMachineCode();
+        }
+
         OutboundRecord record = new OutboundRecord();
         record.setPartId(request.getPartId());
         record.setQuantity(request.getQuantity());
         record.setProductionLine(request.getProductionLine());
+        record.setMachineId(request.getMachineId());
+        record.setMachineCode(machineCode);
         record.setOperator(request.getOperator());
         record.setCreatedAt(now);
         record.setPartName(updatedPart.getName());
@@ -141,6 +163,7 @@ public class OutboundServiceImpl implements OutboundService {
         String productionLine = StringUtils.hasText(request.getProductionLine()) ? request.getProductionLine() : "";
         String partId = request.getPartId() != null ? request.getPartId().toString() : "";
         String quantity = request.getQuantity() != null ? request.getQuantity().toString() : "";
-        return productionLine + ":" + partId + ":" + quantity;
+        String machineId = request.getMachineId() != null ? request.getMachineId().toString() : "";
+        return productionLine + ":" + partId + ":" + quantity + ":" + machineId;
     }
 }

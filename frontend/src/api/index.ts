@@ -81,6 +81,8 @@ export interface OutboundRecord {
   part_model: string
   quantity: number
   production_line: string
+  machine_id?: number | null
+  machine_code?: string | null
   operator: string
   created_at: string
 }
@@ -173,6 +175,18 @@ export interface PartDeletionCheck {
   total_related_count: number
 }
 
+export interface PackagingMachine {
+  id: number
+  machine_code: string
+  machine_name: string
+  production_line: string
+  status: number
+  sort_order: number
+  remark?: string
+  created_at: string
+  updated_at: string
+}
+
 export const partsApi = {
   list: (params?: Record<string, unknown>) => http.get<any, PageResult<Part>>('/api/parts', { params }),
   getById: (id: number) => http.get<any, Part>(`/api/parts/${id}`),
@@ -204,8 +218,15 @@ export const shelfOccupancyApi = {
 
 export const outboundApi = {
   list: (params?: Record<string, unknown>) => http.get<any, PageResult<OutboundRecord>>('/api/outbound', { params }),
-  create: (data: { part_id: number; quantity: number; production_line: string; operator: string }) =>
+  create: (data: { part_id: number; quantity: number; production_line: string; machine_id?: number | null; operator: string }) =>
     http.post<any, OutboundRecord>('/api/outbound', data),
+}
+
+export const packagingMachineApi = {
+  list: (params?: { production_line?: string }) =>
+    http.get<any, PackagingMachine[]>('/api/packaging-machines', { params }),
+  getById: (id: number) => http.get<any, PackagingMachine>(`/api/packaging-machines/${id}`),
+  getByCode: (code: string) => http.get<any, PackagingMachine>(`/api/packaging-machines/code/${code}`),
 }
 
 export const inventoryApi = {
