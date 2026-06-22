@@ -39,7 +39,11 @@ public class AccessoryCategoryController {
 
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
-        categoryService.delete(id);
+        try {
+            categoryService.delete(id);
+        } catch (RuntimeException e) {
+            return Result.error(400, e.getMessage(), null);
+        }
         return Result.ok(null);
     }
 }

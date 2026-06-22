@@ -172,6 +172,14 @@ const onModalSubmit = async () => {
     showToast('货架位置格式不正确', 'error')
     return
   }
+  if (form.value.current_stock < 0) {
+    showToast('当前库存不能为负数', 'error')
+    return
+  }
+  if (form.value.total_quantity < 0) {
+    showToast('入库总量不能为负数', 'error')
+    return
+  }
 
   try {
     modalLoading.value = true

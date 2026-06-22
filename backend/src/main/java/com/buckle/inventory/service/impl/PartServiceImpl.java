@@ -298,12 +298,61 @@ public class PartServiceImpl implements PartService {
 
     @Override
     public Part updatePart(Part part) {
+        if (!StringUtils.hasText(part.getName())) {
+            throw new RuntimeException("配件名称不能为空");
+        }
+        if (!StringUtils.hasText(part.getModel())) {
+            throw new RuntimeException("配件型号不能为空");
+        }
+        if (part.getCategoryId() == null) {
+            throw new RuntimeException("请选择配件类别");
+        }
+        AccessoryCategory category = categoryMapper.selectById(part.getCategoryId());
+        if (category == null) {
+            throw new RuntimeException("配件类别不存在");
+        }
         if (!ShelfPositionValidator.isValid(part.getShelfPosition())) {
             throw new ValidationException("shelfPosition", "货架位置" + ShelfPositionValidator.FORMAT_HINT);
         }
+        if (part.getCurrentStock() != null && part.getCurrentStock() < 0) {
+            throw new RuntimeException("当前库存不能为负数");
+        }
+        if (part.getTotalQuantity() != null && part.getTotalQuantity() < 0) {
+            throw new RuntimeException("累计入库量不能为负数");
+        }
+
         Part oldPart = partMapper.selectById(part.getId());
-        String oldShelfPosition = oldPart != null ? oldPart.getShelfPosition() : null;
-        Long oldCategoryId = oldPart != null ? oldPart.getCategoryId() : null;
+        if (oldPart == null) {
+            throw new RuntimeException("配件不存在");
+        }
+        String oldShelfPosition = oldPart.getShelfPosition();
+        Long oldCategoryId = oldPart.getCategoryId();
+        int oldCurrentStock = oldPart.getCurrentStock() != null ? oldPart.getCurrentStock() : 0;
+        int newCurrentStock = part.getCurrentStock() != null ? part.getCurrentStock() : 0;
+
+        boolean shelfChanged = oldShelfPosition != null && !oldShelfPosition.equals(part.getShelfPosition());
+        if (shelfChanged) {
+            int additionalQuantity = newCurrentStock;
+            boolean isNewTypeForShelf = true;
+            LambdaQueryWrapper<Part> sameTypeWrapper = new LambdaQueryWrapper<>();
+            sameTypeWrapper.eq(Part::getShelfPosition, part.getShelfPosition())
+                    .eq(Part::getName, part.getName())
+                    .eq(Part::getModel, part.getModel())
+                    .eq(Part::getDeleted, 0)
+                    .ne(Part::getId, part.getId());
+            List<Part> sameTypeOnTarget = partMapper.selectList(sameTypeWrapper);
+            if (!sameTypeOnTarget.isEmpty()) {
+                isNewTypeForShelf = false;
+                additionalQuantity = Math.max(0, newCurrentStock);
+            }
+            shelfOccupancyService.checkCapacity(part.getShelfPosition(), additionalQuantity, isNewTypeForShelf);
+        } else {
+            int stockDiff = newCurrentStock - oldCurrentStock;
+            if (stockDiff > 0) {
+                shelfOccupancyService.checkCapacity(part.getShelfPosition(), stockDiff, false);
+            }
+        }
+
         part.setUpdatedAt(LocalDateTime.now());
         partMapper.updateById(part);
         redisCacheService.evictPartRelatedCache(part.getId(), oldShelfPosition, oldCategoryId,
