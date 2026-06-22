@@ -351,8 +351,8 @@ onMounted(() => {
                         </span>
                       </div>
                       <div class="flex items-center gap-2 mt-1">
-                        <ProductionLineBadge :production-line="record.production_line" />
-                        <MachineBadge v-if="record.machine_code" :machine-code="record.machine_code" />
+                        <ProductionLineBadge :line="record.production_line" />
+                        <MachineBadge v-if="record.machine_code" :code="record.machine_code" />
                         <span class="text-xs text-gray-500">
                           操作人：{{ record.operator }} · {{ record.created_at }}
                         </span>

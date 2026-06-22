@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import { CheckCircle, XCircle, Info } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -12,14 +12,31 @@ const emit = defineEmits<{
   'update:visible': [value: boolean]
 }>()
 
+let closeTimer: ReturnType<typeof setTimeout> | null = null
+
+const clearCloseTimer = () => {
+  if (closeTimer !== null) {
+    clearTimeout(closeTimer)
+    closeTimer = null
+  }
+}
+
 watch(
   () => props.visible,
   (val) => {
+    clearCloseTimer()
     if (val) {
-      setTimeout(() => emit('update:visible', false), 3000)
+      closeTimer = setTimeout(() => {
+        emit('update:visible', false)
+        closeTimer = null
+      }, 3000)
     }
   },
 )
+
+onBeforeUnmount(() => {
+  clearCloseTimer()
+})
 
 const colorMap = {
   success: 'bg-success text-white',

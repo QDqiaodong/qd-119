@@ -3,6 +3,7 @@ package com.buckle.inventory.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.buckle.inventory.dto.BracketPartDTO;
 import com.buckle.inventory.dto.BucklePartDTO;
+import com.buckle.inventory.dto.PageResult;
 import com.buckle.inventory.entity.AccessoryCategory;
 import com.buckle.inventory.entity.InboundRecord;
 import com.buckle.inventory.entity.OutboundRecord;
@@ -105,6 +106,27 @@ public class BuckleBracketServiceImpl implements BuckleBracketService {
         return result;
     }
 
+    @Override
+    public PageResult<BucklePartDTO> pageBuckles(int page, int size) {
+        List<BucklePartDTO> all = listBuckles();
+        return paginate(all, page, size);
+    }
+
+    @Override
+    public PageResult<BracketPartDTO> pageBrackets(int page, int size) {
+        List<BracketPartDTO> all = listBrackets();
+        return paginate(all, page, size);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> PageResult<T> paginate(List<? extends T> all, int page, int size) {
+        int total = all.size();
+        int fromIndex = Math.max(0, (page - 1) * size);
+        int toIndex = Math.min(total, fromIndex + size);
+        List<T> pageList = fromIndex >= total ? Collections.emptyList() : new ArrayList<>(all.subList(fromIndex, toIndex));
+        return new PageResult<>(pageList, total, page, size);
+    }
+
     private List<BucklePartDTO> buildParts(String categoryCode, boolean isBracket) {
         Long categoryId = resolveCategoryId(categoryCode);
         if (categoryId == null) {
@@ -199,9 +221,9 @@ public class BuckleBracketServiceImpl implements BuckleBracketService {
             if (records != null) {
                 for (OutboundRecord record : records) {
                     if (record == null || record.getPartId() == null) continue;
-                    String line = record.getProductionLine();
-                    if (line != null && !line.trim().isEmpty()) {
-                        grouped.computeIfAbsent(record.getPartId(), k -> new LinkedHashSet<>()).add(line.trim());
+                    String machineCode = record.getMachineCode();
+                    if (machineCode != null && !machineCode.trim().isEmpty()) {
+                        grouped.computeIfAbsent(record.getPartId(), k -> new LinkedHashSet<>()).add(machineCode.trim());
                     }
                 }
             }

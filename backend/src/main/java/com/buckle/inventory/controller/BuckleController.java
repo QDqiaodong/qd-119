@@ -7,8 +7,6 @@ import com.buckle.inventory.service.BuckleBracketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/buckles")
 @CrossOrigin
@@ -20,8 +18,6 @@ public class BuckleController {
     @GetMapping
     public Result<PageResult<BucklePartDTO>> list(@RequestParam(defaultValue = "1") int page,
                                                    @RequestParam(defaultValue = "100") int size) {
-        List<BucklePartDTO> list = buckleBracketService.listBuckles();
-        PageResult<BucklePartDTO> pageResult = new PageResult<>(list, list.size(), page, size);
-        return Result.ok(pageResult);
+        return Result.ok(buckleBracketService.pageBuckles(page, size));
     }
 }
