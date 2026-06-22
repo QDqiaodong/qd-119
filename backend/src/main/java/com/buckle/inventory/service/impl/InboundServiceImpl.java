@@ -17,6 +17,8 @@ import com.buckle.inventory.mapper.ScrapRecordMapper;
 import com.buckle.inventory.service.InboundService;
 import com.buckle.inventory.service.RedisCacheService;
 import com.buckle.inventory.service.ShelfOccupancyService;
+import com.buckle.inventory.exception.ValidationException;
+import com.buckle.inventory.util.ShelfPositionValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -200,6 +202,9 @@ public class InboundServiceImpl implements InboundService {
         }
         if (!StringUtils.hasText(request.getOperator())) {
             throw new RuntimeException("操作人不能为空");
+        }
+        if (!ShelfPositionValidator.isValid(request.getShelfPosition())) {
+            throw new ValidationException("shelfPosition", "货架位置" + ShelfPositionValidator.FORMAT_HINT);
         }
     }
 

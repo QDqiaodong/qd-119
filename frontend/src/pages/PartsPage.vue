@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { Plus, Search, Edit, Trash2, Loader2, PackagePlus, X } from 'lucide-vue-next'
-import { partsApi, inboundApi, accessoryCategoryApi, shelfOccupancyApi, type Part, type AccessoryCategory, type ShelfOccupancyInfo, type PartDeletionCheck } from '@/api'
+import { partsApi, inboundApi, accessoryCategoryApi, shelfOccupancyApi, type Part, type AccessoryCategory, type ShelfOccupancyInfo, type PartDeletionCheck, type ApiError } from '@/api'
 import Toast from '@/components/Toast.vue'
 import useInventoryRefresh from '@/composables/useInventoryRefresh'
+import { isValidShelfPosition, SHELF_POSITION_HINT } from '@/lib/utils'
 
 const { inventoryVersion, refreshInventory } = useInventoryRefresh()
 
@@ -36,6 +37,7 @@ const showModal = ref(false)
 const editingPart = ref<Part | null>(null)
 const modalLoading = ref(false)
 const deleteLoading = ref<number | null>(null)
+const shelfPositionError = ref<string | null>(null)
 
 const showBatchInboundModal = ref(false)
 const batchSubmitting = ref(false)
@@ -57,12 +59,14 @@ const form = ref({
 
 watch(() => form.value.shelf_position, async (pos) => {
   if (pos && pos.trim()) {
+    shelfPositionError.value = isValidShelfPosition(pos) ? null : SHELF_POSITION_HINT
     try {
       shelfInfo.value = await shelfOccupancyApi.getByPosition(encodeURIComponent(pos))
     } catch {
       shelfInfo.value = null
     }
   } else {
+    shelfPositionError.value = null
     shelfInfo.value = null
   }
 })
@@ -128,6 +132,7 @@ const openAddModal = () => {
   editingPart.value = null
   form.value = { category_id: 0, name: '', model: '', total_quantity: 0, current_stock: 0, shelf_position: '' }
   shelfInfo.value = null
+  shelfPositionError.value = null
   showModal.value = true
 }
 
@@ -142,6 +147,7 @@ const openEditModal = (part: Part) => {
     shelf_position: part.shelf_position,
   }
   shelfInfo.value = null
+  shelfPositionError.value = null
   showModal.value = true
 }
 
@@ -149,6 +155,7 @@ const closeModal = () => {
   showModal.value = false
   editingPart.value = null
   shelfInfo.value = null
+  shelfPositionError.value = null
 }
 
 const onModalSubmit = async () => {
@@ -158,6 +165,11 @@ const onModalSubmit = async () => {
   }
   if (!form.value.name || !form.value.model) {
     showToast('请填写配件名称和型号', 'error')
+    return
+  }
+  if (!isValidShelfPosition(form.value.shelf_position)) {
+    shelfPositionError.value = SHELF_POSITION_HINT
+    showToast('货架位置格式不正确', 'error')
     return
   }
 
@@ -174,6 +186,10 @@ const onModalSubmit = async () => {
     closeModal()
     refreshInventory()
   } catch (e: any) {
+    const apiErr = e as ApiError
+    if (apiErr.fieldErrors?.shelfPosition) {
+      shelfPositionError.value = apiErr.fieldErrors.shelfPosition
+    }
     showToast((editingPart.value ? '更新失败：' : '添加失败：') + (e?.message || '请重试'), 'error')
   } finally {
     modalLoading.value = false
@@ -495,7 +511,13 @@ onMounted(() => {
             <div>
               <label class="block text-sm font-medium text-gray-600 mb-1">货架位置</label>
               <input v-model="form.shelf_position" type="text" placeholder="如 A-01-03"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                :class="[
+                  'w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500',
+                  shelfPositionError ? 'border-danger' : 'border-gray-300'
+                ]" />
+              <p v-if="shelfPositionError" class="mt-1 text-xs text-danger">
+                ⚠️ {{ shelfPositionError }}
+              </p>
               <div v-if="shelfInfo" class="mt-2 p-3 bg-gray-50 rounded-lg text-xs space-y-2">
                 <div class="flex justify-between text-gray-600">
                   <span>配件种类：{{ shelfInfo.part_type_count }} / {{ shelfInfo.max_part_types }}</span>

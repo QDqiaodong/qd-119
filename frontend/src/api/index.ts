@@ -1,5 +1,13 @@
 import axios from 'axios'
 
+export interface FieldErrors {
+  [key: string]: string
+}
+
+export interface ApiError extends Error {
+  fieldErrors?: FieldErrors
+}
+
 const http = axios.create({ baseURL: '' })
 
 http.interceptors.response.use(
@@ -8,9 +16,23 @@ http.interceptors.response.use(
     if (result && result.code === 200) {
       return result.data
     }
-    return Promise.reject(new Error(result?.message || '请求失败'))
+    const err = new Error(result?.message || '请求失败') as ApiError
+    if (result?.data?.fieldErrors) {
+      err.fieldErrors = result.data.fieldErrors as FieldErrors
+    }
+    return Promise.reject(err)
   },
-  (err) => Promise.reject(err),
+  (err) => {
+    if (err.response?.data) {
+      const result = err.response.data
+      const apiErr = new Error(result?.message || '请求失败') as ApiError
+      if (result?.data?.fieldErrors) {
+        apiErr.fieldErrors = result.data.fieldErrors as FieldErrors
+      }
+      return Promise.reject(apiErr)
+    }
+    return Promise.reject(err)
+  },
 )
 
 export interface Part {

@@ -20,6 +20,8 @@ import com.buckle.inventory.mapper.ScrapRecordMapper;
 import com.buckle.inventory.service.PartService;
 import com.buckle.inventory.service.RedisCacheService;
 import com.buckle.inventory.service.ShelfOccupancyService;
+import com.buckle.inventory.exception.ValidationException;
+import com.buckle.inventory.util.ShelfPositionValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -266,6 +268,9 @@ public class PartServiceImpl implements PartService {
         if (!StringUtils.hasText(part.getModel())) {
             throw new RuntimeException("配件型号不能为空");
         }
+        if (!ShelfPositionValidator.isValid(part.getShelfPosition())) {
+            throw new ValidationException("shelfPosition", "货架位置" + ShelfPositionValidator.FORMAT_HINT);
+        }
         if (part.getTotalQuantity() == null) {
             part.setTotalQuantity(0);
         }
@@ -293,6 +298,9 @@ public class PartServiceImpl implements PartService {
 
     @Override
     public Part updatePart(Part part) {
+        if (!ShelfPositionValidator.isValid(part.getShelfPosition())) {
+            throw new ValidationException("shelfPosition", "货架位置" + ShelfPositionValidator.FORMAT_HINT);
+        }
         Part oldPart = partMapper.selectById(part.getId());
         String oldShelfPosition = oldPart != null ? oldPart.getShelfPosition() : null;
         Long oldCategoryId = oldPart != null ? oldPart.getCategoryId() : null;
@@ -361,6 +369,9 @@ public class PartServiceImpl implements PartService {
             }
             if (!StringUtils.hasText(part.getModel())) {
                 throw new RuntimeException("配件型号不能为空");
+            }
+            if (!ShelfPositionValidator.isValid(part.getShelfPosition())) {
+                throw new ValidationException("shelfPosition", "货架位置" + ShelfPositionValidator.FORMAT_HINT + (part.getName() != null ? "（配件：" + part.getName() + "）" : ""));
             }
             if (part.getTotalQuantity() == null) {
                 part.setTotalQuantity(0);

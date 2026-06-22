@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { Plus, Search, Loader2 } from 'lucide-vue-next'
-import { inboundApi, partsApi, accessoryCategoryApi, shelfOccupancyApi, type InboundRecord, type Part, type AccessoryCategory, type ShelfOccupancyInfo } from '@/api'
+import { inboundApi, partsApi, accessoryCategoryApi, shelfOccupancyApi, type InboundRecord, type Part, type AccessoryCategory, type ShelfOccupancyInfo, type ApiError } from '@/api'
 import Toast from '@/components/Toast.vue'
 import useInventoryRefresh from '@/composables/useInventoryRefresh'
+import { isValidShelfPosition, SHELF_POSITION_HINT } from '@/lib/utils'
 
 const { inventoryVersion, refreshInventory } = useInventoryRefresh()
 
@@ -30,6 +31,7 @@ const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') 
 
 const selectedPartId = ref<number | null>(null)
 const isNewPart = ref(true)
+const shelfPositionError = ref<string | null>(null)
 
 const form = ref({
   category_id: 0,
@@ -42,12 +44,14 @@ const form = ref({
 
 watch(() => form.value.shelf_position, async (pos) => {
   if (pos && pos.trim()) {
+    shelfPositionError.value = isValidShelfPosition(pos) ? null : SHELF_POSITION_HINT
     try {
       shelfInfo.value = await shelfOccupancyApi.getByPosition(encodeURIComponent(pos))
     } catch {
       shelfInfo.value = null
     }
   } else {
+    shelfPositionError.value = null
     shelfInfo.value = null
   }
 })
@@ -71,6 +75,7 @@ const resetForm = () => {
   selectedPartId.value = null
   isNewPart.value = true
   shelfInfo.value = null
+  shelfPositionError.value = null
 }
 
 const onPartSelect = (id: number | null) => {
@@ -82,6 +87,7 @@ const onPartSelect = (id: number | null) => {
       form.value.model = part.model
       form.value.shelf_position = part.shelf_position
       isNewPart.value = false
+      shelfPositionError.value = null
     }
   } else {
     form.value.category_id = 0
@@ -89,6 +95,7 @@ const onPartSelect = (id: number | null) => {
     form.value.model = ''
     form.value.shelf_position = ''
     isNewPart.value = true
+    shelfPositionError.value = null
   }
 }
 
@@ -145,6 +152,11 @@ const onSubmit = async () => {
     showToast('请填写操作人', 'error')
     return
   }
+  if (!isValidShelfPosition(form.value.shelf_position)) {
+    shelfPositionError.value = SHELF_POSITION_HINT
+    showToast('货架位置格式不正确', 'error')
+    return
+  }
 
   try {
     submitLoading.value = true
@@ -161,6 +173,10 @@ const onSubmit = async () => {
     resetForm()
     refreshInventory()
   } catch (e: any) {
+    const apiErr = e as ApiError
+    if (apiErr.fieldErrors?.shelfPosition) {
+      shelfPositionError.value = apiErr.fieldErrors.shelfPosition
+    }
     showToast('入库登记失败：' + (e?.message || '请重试'), 'error')
   } finally {
     submitLoading.value = false
@@ -233,7 +249,13 @@ onMounted(() => {
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">{{ isNewPart ? '货架位置' : '货架位置(可选，变更时填写)' }}</label>
           <input v-model="form.shelf_position" type="text" placeholder="如 A-01-03"
-            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            :class="[
+              'w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500',
+              shelfPositionError ? 'border-danger' : 'border-gray-300'
+            ]" />
+          <p v-if="shelfPositionError" class="mt-1 text-xs text-danger">
+            ⚠️ {{ shelfPositionError }}
+          </p>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1"><span class="text-danger">*</span> 操作人</label>
