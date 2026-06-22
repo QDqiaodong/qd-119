@@ -96,6 +96,7 @@ export interface ScrapRecord {
   reason: string
   remark: string
   operator: string
+  confirmed: number
   created_at: string
 }
 
@@ -149,6 +150,9 @@ export interface DashboardOverview {
   total_stock: number
   monthly_inbound: number
   monthly_outbound: number
+  monthly_confirmed_scrap: number
+  stat_period_start: string
+  stat_period_end: string
 }
 
 export interface BucklePart extends Part {

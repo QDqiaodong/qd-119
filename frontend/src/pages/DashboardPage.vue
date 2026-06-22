@@ -13,6 +13,9 @@ const overview = ref<DashboardOverview>({
   total_stock: 0,
   monthly_inbound: 0,
   monthly_outbound: 0,
+  monthly_confirmed_scrap: 0,
+  stat_period_start: '',
+  stat_period_end: '',
 })
 const recentActivities = ref<RecentActivity[]>([])
 
@@ -48,7 +51,15 @@ const loadData = async () => {
       type: (a.type || '').toLowerCase(),
     }))
   } catch {
-    overview.value = { total_parts: 0, total_stock: 0, monthly_inbound: 0, monthly_outbound: 0 }
+    overview.value = {
+      total_parts: 0,
+      total_stock: 0,
+      monthly_inbound: 0,
+      monthly_outbound: 0,
+      monthly_confirmed_scrap: 0,
+      stat_period_start: '',
+      stat_period_end: '',
+    }
   } finally {
     loading.value = false
   }
@@ -65,7 +76,12 @@ onMounted(() => {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-primary-800 mb-6">库存概览</h1>
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold text-primary-800 mb-2">库存概览</h1>
+      <div v-if="overview.stat_period_start && overview.stat_period_end" class="text-sm text-gray-500">
+        统计区间：{{ overview.stat_period_start }} ～ {{ overview.stat_period_end }}
+      </div>
+    </div>
 
     <div v-if="loading" class="flex items-center justify-center h-64">
       <div class="w-8 h-8 border-4 border-primary-300 border-t-primary-800 rounded-full animate-spin"></div>

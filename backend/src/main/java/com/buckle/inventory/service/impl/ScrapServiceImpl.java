@@ -109,6 +109,7 @@ public class ScrapServiceImpl implements ScrapService {
         record.setReason(processedReasons);
         record.setRemark(request.getRemark());
         record.setOperator(request.getOperator());
+        record.setConfirmed(1);
         record.setCreatedAt(now);
         record.setPartName(updatedPart.getName());
         record.setPartModel(updatedPart.getModel());

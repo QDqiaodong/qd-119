@@ -6,6 +6,7 @@ import com.buckle.inventory.dto.RecentActivity;
 import com.buckle.inventory.entity.InboundRecord;
 import com.buckle.inventory.entity.OutboundRecord;
 import com.buckle.inventory.entity.Part;
+import com.buckle.inventory.entity.ScrapRecord;
 import com.buckle.inventory.mapper.InboundRecordMapper;
 import com.buckle.inventory.mapper.OutboundRecordMapper;
 import com.buckle.inventory.mapper.PartMapper;
@@ -79,10 +80,10 @@ public class DashboardServiceImpl implements DashboardService {
 
         int monthlyInbound = 0;
         int monthlyOutbound = 0;
+        int monthlyConfirmedScrap = 0;
+        LocalDateTime monthStart = YearMonth.now().atDay(1).atStartOfDay();
+        LocalDateTime monthEnd = LocalDateTime.now();
         try {
-            LocalDateTime monthStart = YearMonth.now().atDay(1).atStartOfDay();
-            LocalDateTime monthEnd = LocalDateTime.now();
-
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<InboundRecord> inboundWrapper =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
             inboundWrapper.between(InboundRecord::getCreatedAt, monthStart, monthEnd);
@@ -102,11 +103,29 @@ public class DashboardServiceImpl implements DashboardService {
                         .filter(r -> r != null && r.getQuantity() != null)
                         .mapToInt(OutboundRecord::getQuantity).sum();
             }
+
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ScrapRecord> scrapWrapper =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            scrapWrapper.between(ScrapRecord::getCreatedAt, monthStart, monthEnd);
+            scrapWrapper.eq(ScrapRecord::getConfirmed, 1);
+            List<ScrapRecord> scrapRecords = scrapRecordMapper.selectList(scrapWrapper);
+            if (scrapRecords != null) {
+                monthlyConfirmedScrap = scrapRecords.stream()
+                        .filter(r -> r != null && r.getQuantity() != null)
+                        .mapToInt(ScrapRecord::getQuantity).sum();
+            }
         } catch (Exception e) {
             log.warn("[getOverview] query monthly records failed: {}", e.getMessage());
         }
 
-        DashboardOverview overview = new DashboardOverview(totalParts, totalStock, monthlyInbound, monthlyOutbound);
+        DashboardOverview overview = new DashboardOverview();
+        overview.setTotalParts(totalParts);
+        overview.setTotalStock(totalStock);
+        overview.setMonthlyInbound(monthlyInbound);
+        overview.setMonthlyOutbound(monthlyOutbound + monthlyConfirmedScrap);
+        overview.setMonthlyConfirmedScrap(monthlyConfirmedScrap);
+        overview.setStatPeriodStart(monthStart);
+        overview.setStatPeriodEnd(monthEnd);
         try {
             redisCacheService.setDashboardOverviewCache(overview);
         } catch (Exception e) {

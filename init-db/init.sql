@@ -132,9 +132,11 @@ CREATE TABLE IF NOT EXISTS scrap_record (
     reason VARCHAR(200) NOT NULL COMMENT '报废原因',
     remark VARCHAR(500) COMMENT '备注',
     operator VARCHAR(50) NOT NULL COMMENT '操作人',
+    confirmed TINYINT NOT NULL DEFAULT 1 COMMENT '是否确认 0-未确认 1-已确认',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_part_id (part_id),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_confirmed (confirmed)
 ) ENGINE=InnoDB COMMENT='报废记录表';
 
 CREATE TABLE IF NOT EXISTS scrap_reason_dict (

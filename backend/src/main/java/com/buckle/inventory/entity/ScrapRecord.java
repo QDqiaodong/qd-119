@@ -34,6 +34,9 @@ public class ScrapRecord {
     @TableField("operator")
     private String operator;
 
+    @TableField("confirmed")
+    private Integer confirmed;
+
     @TableField("created_at")
     private LocalDateTime createdAt;
 
