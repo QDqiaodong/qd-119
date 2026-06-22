@@ -147,26 +147,39 @@ public class ShelfMigrationServiceImpl implements ShelfMigrationService {
                 throw new RuntimeException("扣减原货架库存失败");
             }
 
-            Part targetPart = new Part();
-            targetPart.setCategoryId(sourcePart.getCategoryId());
-            targetPart.setName(sourcePart.getName());
-            targetPart.setModel(sourcePart.getModel());
-            targetPart.setTotalQuantity(0);
-            targetPart.setCurrentStock(migrateQuantity);
-            targetPart.setShelfPosition(targetShelf);
-            targetPart.setDeleted(0);
-            targetPart.setCreatedAt(now);
-            targetPart.setUpdatedAt(now);
-            partMapper.insert(targetPart);
+            if (!existingPartsOnTarget.isEmpty()) {
+                Part existingTargetPart = existingPartsOnTarget.get(0);
+                int addAffected = partMapper.addStock(existingTargetPart.getId(), migrateQuantity, now);
+                if (addAffected == 0) {
+                    throw new RuntimeException("累加目标货架库存失败");
+                }
 
-            if (targetPart.getId() == null) {
-                throw new RuntimeException("创建目标货架配件记录失败");
+                redisCacheService.evictPartRelatedCache(sourcePart.getId(), null, null,
+                        sourceShelf, sourcePart.getCategoryId());
+                redisCacheService.evictPartRelatedCache(existingTargetPart.getId(), null, null,
+                        targetShelf, existingTargetPart.getCategoryId());
+            } else {
+                Part targetPart = new Part();
+                targetPart.setCategoryId(sourcePart.getCategoryId());
+                targetPart.setName(sourcePart.getName());
+                targetPart.setModel(sourcePart.getModel());
+                targetPart.setTotalQuantity(migrateQuantity);
+                targetPart.setCurrentStock(migrateQuantity);
+                targetPart.setShelfPosition(targetShelf);
+                targetPart.setDeleted(0);
+                targetPart.setCreatedAt(now);
+                targetPart.setUpdatedAt(now);
+                partMapper.insert(targetPart);
+
+                if (targetPart.getId() == null) {
+                    throw new RuntimeException("创建目标货架配件记录失败");
+                }
+
+                redisCacheService.evictPartRelatedCache(sourcePart.getId(), null, null,
+                        sourceShelf, sourcePart.getCategoryId());
+                redisCacheService.evictPartRelatedCache(targetPart.getId(), null, null,
+                        targetShelf, targetPart.getCategoryId());
             }
-
-            redisCacheService.evictPartRelatedCache(sourcePart.getId(), null, null,
-                    sourceShelf, sourcePart.getCategoryId());
-            redisCacheService.evictPartRelatedCache(targetPart.getId(), null, null,
-                    targetShelf, targetPart.getCategoryId());
         }
 
         ShelfMigrationRecord record = new ShelfMigrationRecord();

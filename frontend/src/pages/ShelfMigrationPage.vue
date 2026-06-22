@@ -2,10 +2,12 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { ArrowRightLeft, Search, Loader2, MoveRight } from 'lucide-vue-next'
 import { shelfMigrationApi, partsApi, shelfOccupancyApi, type ShelfMigrationRecord, type Part, type ShelfOccupancyInfo, type ApiError } from '@/api'
+import { useRoute } from 'vue-router'
 import Toast from '@/components/Toast.vue'
 import useInventoryRefresh from '@/composables/useInventoryRefresh'
 import { isValidShelfPosition, SHELF_POSITION_HINT } from '@/lib/utils'
 
+const route = useRoute()
 const { inventoryVersion, refreshInventory } = useInventoryRefresh()
 
 const loading = ref(true)
@@ -30,6 +32,7 @@ const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') 
 
 const selectedPartId = ref<number | null>(null)
 const targetShelfError = ref<string | null>(null)
+const shelfOccupancyReqSeq = ref(0)
 
 const form = ref({
   target_shelf: '',
@@ -40,12 +43,19 @@ const form = ref({
 watch(() => form.value.target_shelf, async (pos) => {
   if (pos && pos.trim()) {
     targetShelfError.value = isValidShelfPosition(pos) ? null : SHELF_POSITION_HINT
+    const reqSeq = ++shelfOccupancyReqSeq.value
     try {
-      shelfInfo.value = await shelfOccupancyApi.getByPosition(encodeURIComponent(pos))
+      const result = await shelfOccupancyApi.getByPosition(encodeURIComponent(pos))
+      if (reqSeq === shelfOccupancyReqSeq.value) {
+        shelfInfo.value = result
+      }
     } catch {
-      shelfInfo.value = null
+      if (reqSeq === shelfOccupancyReqSeq.value) {
+        shelfInfo.value = null
+      }
     }
   } else {
+    shelfOccupancyReqSeq.value++
     targetShelfError.value = null
     shelfInfo.value = null
   }
@@ -72,6 +82,19 @@ const selectedPart = computed(() =>
 const isFullMigration = computed(() => {
   if (!selectedPart.value) return false
   return form.value.quantity === selectedPart.value.current_stock
+})
+
+const sameModelExists = computed(() => {
+  if (!selectedPart.value || !shelfInfo.value) return false
+  const targetShelf = form.value.target_shelf
+  if (!targetShelf) return false
+  return parts.value.some(
+    (p) =>
+      p.id !== selectedPart.value!.id &&
+      p.shelf_position === targetShelf &&
+      p.name === selectedPart.value!.name &&
+      p.model === selectedPart.value!.model,
+  )
 })
 
 const onPartSelect = (id: number | null) => {
@@ -109,6 +132,13 @@ const fetchParts = async () => {
   try {
     const res = await partsApi.list({ page: 1, size: 999 })
     parts.value = (res.list ?? []).filter((p) => p.current_stock > 0)
+    const queryPartId = route.query.part_id
+    if (queryPartId && !selectedPartId.value) {
+      const pid = Number(queryPartId)
+      if (pid && parts.value.some((p) => p.id === pid)) {
+        onPartSelect(pid)
+      }
+    }
   } catch {
     parts.value = []
   }
@@ -290,8 +320,14 @@ onMounted(() => {
             整体迁移后，配件货架位置将更新为 <span class="font-medium text-green-600">{{ form.target_shelf }}</span>，总库存保持不变。
           </template>
           <template v-else>
-            拆分迁移后，将在 <span class="font-medium text-green-600">{{ form.target_shelf }}</span> 新建一条库存记录（数量: {{ form.quantity }}），
-            原货架 <span class="font-medium text-orange-600">{{ selectedPart.shelf_position }}</span> 剩余库存: {{ (selectedPart.current_stock || 0) - form.quantity }}，总库存保持不变。
+            <template v-if="shelfInfo && sameModelExists">
+              拆分迁移后，将与目标货架同型号配件合并库存（数量增加 {{ form.quantity }}），
+              原货架 <span class="font-medium text-orange-600">{{ selectedPart.shelf_position }}</span> 剩余库存: {{ (selectedPart.current_stock || 0) - form.quantity }}，总库存保持不变。
+            </template>
+            <template v-else>
+              拆分迁移后，将在 <span class="font-medium text-green-600">{{ form.target_shelf }}</span> 新建一条库存记录（数量: {{ form.quantity }}），
+              原货架 <span class="font-medium text-orange-600">{{ selectedPart.shelf_position }}</span> 剩余库存: {{ (selectedPart.current_stock || 0) - form.quantity }}，总库存保持不变。
+            </template>
           </template>
         </p>
       </div>

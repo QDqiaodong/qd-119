@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { Plus, Search, Edit, Trash2, Loader2, PackagePlus, X } from 'lucide-vue-next'
+import { Plus, Search, Edit, Trash2, Loader2, PackagePlus, X, ArrowRightLeft } from 'lucide-vue-next'
 import { partsApi, inboundApi, accessoryCategoryApi, shelfOccupancyApi, type Part, type AccessoryCategory, type ShelfOccupancyInfo, type PartDeletionCheck, type ApiError } from '@/api'
+import { useRouter } from 'vue-router'
 import Toast from '@/components/Toast.vue'
 import useInventoryRefresh from '@/composables/useInventoryRefresh'
 import { isValidShelfPosition, SHELF_POSITION_HINT } from '@/lib/utils'
 
 const { inventoryVersion, refreshInventory } = useInventoryRefresh()
+const router = useRouter()
 
 const loading = ref(true)
 const parts = ref<Part[]>([])
@@ -38,6 +40,7 @@ const editingPart = ref<Part | null>(null)
 const modalLoading = ref(false)
 const deleteLoading = ref<number | null>(null)
 const shelfPositionError = ref<string | null>(null)
+const shelfOccupancyReqSeq = ref(0)
 
 const showBatchInboundModal = ref(false)
 const batchSubmitting = ref(false)
@@ -60,12 +63,19 @@ const form = ref({
 watch(() => form.value.shelf_position, async (pos) => {
   if (pos && pos.trim()) {
     shelfPositionError.value = isValidShelfPosition(pos) ? null : SHELF_POSITION_HINT
+    const reqSeq = ++shelfOccupancyReqSeq.value
     try {
-      shelfInfo.value = await shelfOccupancyApi.getByPosition(encodeURIComponent(pos))
+      const result = await shelfOccupancyApi.getByPosition(encodeURIComponent(pos))
+      if (reqSeq === shelfOccupancyReqSeq.value) {
+        shelfInfo.value = result
+      }
     } catch {
-      shelfInfo.value = null
+      if (reqSeq === shelfOccupancyReqSeq.value) {
+        shelfInfo.value = null
+      }
     }
   } else {
+    shelfOccupancyReqSeq.value++
     shelfPositionError.value = null
     shelfInfo.value = null
   }
@@ -254,6 +264,13 @@ const onBatchInbound = () => {
     selectedParts.value.map((p) => [p.id, 1]),
   )
   showBatchInboundModal.value = true
+}
+
+const goShelfMigration = (part: Part) => {
+  router.push({
+    name: 'shelf-migration',
+    query: { part_id: String(part.id) },
+  })
 }
 
 const closeBatchInbound = () => {
@@ -454,6 +471,10 @@ onMounted(() => {
                 <td class="py-3 px-3 text-gray-400">{{ p.updated_at }}</td>
                 <td class="py-3 px-3">
                   <div class="flex items-center gap-2">
+                    <button @click="goShelfMigration(p)"
+                      class="text-primary-600 hover:text-primary-800 transition-colors" title="货架迁移">
+                      <ArrowRightLeft :size="16" />
+                    </button>
                     <button @click="openEditModal(p)"
                       class="text-primary-600 hover:text-primary-800 transition-colors" title="编辑">
                       <Edit :size="16" />

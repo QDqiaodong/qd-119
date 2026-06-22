@@ -32,6 +32,7 @@ const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') 
 const selectedPartId = ref<number | null>(null)
 const isNewPart = ref(true)
 const shelfPositionError = ref<string | null>(null)
+const shelfOccupancyReqSeq = ref(0)
 
 const form = ref({
   category_id: 0,
@@ -45,12 +46,19 @@ const form = ref({
 watch(() => form.value.shelf_position, async (pos) => {
   if (pos && pos.trim()) {
     shelfPositionError.value = isValidShelfPosition(pos) ? null : SHELF_POSITION_HINT
+    const reqSeq = ++shelfOccupancyReqSeq.value
     try {
-      shelfInfo.value = await shelfOccupancyApi.getByPosition(encodeURIComponent(pos))
+      const result = await shelfOccupancyApi.getByPosition(encodeURIComponent(pos))
+      if (reqSeq === shelfOccupancyReqSeq.value) {
+        shelfInfo.value = result
+      }
     } catch {
-      shelfInfo.value = null
+      if (reqSeq === shelfOccupancyReqSeq.value) {
+        shelfInfo.value = null
+      }
     }
   } else {
+    shelfOccupancyReqSeq.value++
     shelfPositionError.value = null
     shelfInfo.value = null
   }
